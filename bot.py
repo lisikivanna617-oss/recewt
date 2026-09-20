@@ -111,7 +111,7 @@ TEXTS = {
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",  # Default language is English
+            "lang": "en",
             "saved": [],
             "history": [],
             "checked_count": 0,
@@ -178,11 +178,9 @@ async def check_single_username(username: str) -> bool | None:
     except Exception:
         return None
 
-# Аналіз характеристик юзернейму та оцінка
 def analyze_username(username: str):
     clean = username.lstrip("@")
     has_nums = bool(re.search(r"\d", clean))
-    nums_text = "З цифрами 🔢" if has_nums, "Лише букви 🔤" #через кортеж/умову
     nums_str = "With numbers 🔢" if has_nums else "Letters only 🔤"
     
     first_char = clean[0].lower()
@@ -190,7 +188,6 @@ def analyze_username(username: str):
     is_vowel = first_char in vowels
     letter_type = "Vowel (Голосна)" if is_vowel else "Consonant (Приголосна)"
     
-    # Оцінка та ціна залежно від довжини та наявності цифр
     length = len(clean)
     if length <= 5 and not has_nums:
         rating = "5/5 ⭐⭐⭐⭐⭐"
@@ -303,10 +300,8 @@ async def length_selected_callback(callback: CallbackQuery):
                 f"   • Rating: {rating}\n"
                 f"   • Est. Price: <b>{price}</b>"
             )
-            # Кнопка безпосередньо з посиланням на юзернейм
             keyboard_buttons.append([InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}")])
         
-        # Кнопка пошуку наступних 2 юзернеймів + повернення
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
         
@@ -322,4 +317,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-            
+    
