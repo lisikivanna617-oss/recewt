@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 0  # <--- Впишіть сюди ваш Telegram ID, щоб отримувати відгуки!
+ADMIN_ID = 0  # 5619415334
 
 bot = Bot(token=BOT_TOKEN)
 dispatcher = Dispatcher()
@@ -418,4 +418,8 @@ async def type_selected_callback(callback: CallbackQuery):
             ])
         
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_i
+                keyboard_buttons.append([
+            InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
+            InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
+        ])
+    
