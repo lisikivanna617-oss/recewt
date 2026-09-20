@@ -36,7 +36,7 @@ global_stats = {
     "unique_users": set(),
 }
 
-# --- TRANSLATIONS (Default: English) ---
+# --- TRANSLATIONS (Strictly localized) ---
 TEXTS = {
     "en": {
         "welcome": "👋 <b>Welcome, {name}!</b>\n═════════════════════\n<b>USERNAME FIX</b> — automated Telegram username finder & monitor.\n\n👇 <i>Select an option below:</i>",
@@ -46,12 +46,15 @@ TEXTS = {
         "btn_help": "ℹ️ Help",
         "btn_back": "« Back to Menu",
         "search_prompt": "🔍 <b>Auto-Search Usernames</b>\n─────────────────────\nSelect the desired username length (from 5 to 32 characters):",
-        "searching": "🔍 Searching for free usernames of length <b>{length}</b>... Please wait ⏳",
+        "type_prompt": "⚙️ <b>Username Content</b>\n─────────────────────\nDo you want usernames with numbers or letters only?",
+        "btn_letters": "Letters Only 🔤",
+        "btn_numbers": "With Numbers 🔢",
+        "searching": "🔍 Searching for free usernames (Length: <b>{length}</b>)... Please wait ⏳",
         "search_results": "🎉 <b>Found Usernames (Length {length}):</b>\n─────────────────────\n{results}\n\n<i>Click the buttons below to open/claim or load more!</i>",
         "search_none": "❌ No free usernames found in this batch. Try again!",
         "btn_more": "🔄 Load More (2)",
         "mon_prompt": "🔔 <b>Monitoring</b>\n─────────────────────\nSend a taken username to track:",
-        "settings_title": "⚙️ <b>Language Selection</b>\n─────────────────────\nChoose your interface language:",
+        "mon_success": "✅ <b>Monitoring started for <code>{username}</code>!</b>\nWe will notify you immediately once it becomes available.",
         "help_text": "ℹ️ <b>Help</b>\n═════════════════════\nThis bot automatically generates and scans for available Telegram usernames based on your criteria.",
         "lang_changed": "Language successfully changed to English! ✅",
     },
@@ -63,12 +66,15 @@ TEXTS = {
         "btn_help": "ℹ️ Довідка",
         "btn_back": "« Повернутися в меню",
         "search_prompt": "🔍 <b>Авто-пошук юзернеймів</b>\n─────────────────────\nОберіть бажану кількість символів (від 5 до 32):",
-        "searching": "🔍 Шукаємо вільні юзернейми довжиною <b>{length}</b>... Зачекайте⏳",
+        "type_prompt": "⚙️ <b>Вміст юзернейму</b>\n─────────────────────\nБажаєте шукати з цифрами чи лише букви?",
+        "btn_letters": "Лише букви 🔤",
+        "btn_numbers": "З цифрами 🔢",
+        "searching": "🔍 Шукаємо вільні юзернейми (Довжина: <b>{length}</b>)... Зачекайте⏳",
         "search_results": "🎉 <b>Знайдені юзернейми (Довжина {length}):</b>\n─────────────────────\n{results}\n\n<i>Натисніть на кнопки нижче, щоб відкрити юзернейм, або знайдіть ще!</i>",
         "search_none": "❌ У цій спробі вільних юзернеймів не знайдено. Спробуйте ще раз!",
         "btn_more": "🔄 Більше (2)",
         "mon_prompt": "🔔 <b>Моніторинг</b>\n─────────────────────\nВведіть зайнятий юзернейм:",
-        "settings_title": "⚙️ <b>Зміна мови</b>\n─────────────────────\nОберіть мову інтерфейсу:",
+        "mon_success": "✅ <b>Моніторинг для <code>{username}</code> активовано!</b>\nМи повідомимо вас одразу, як тільки він звільниться.",
         "help_text": "ℹ️ <b>Довідка</b>\n═════════════════════\nБот автоматично генерує та перевіряє вільні Telegram юзернейми.",
         "lang_changed": "Мову успішно змінено на українську! ✅",
     },
@@ -80,12 +86,15 @@ TEXTS = {
         "btn_help": "ℹ️ Hilfe",
         "btn_back": "« Zurück zum Menü",
         "search_prompt": "🔍 <b>Benutzernamen-Suche</b>\n─────────────────────\nWählen Sie die Länge (5 bis 32 Zeichen):",
-        "searching": "🔍 Suche nach freien Namen mit Länge <b>{length}</b>...",
+        "type_prompt": "⚙️ <b>Inhalt</b>\n─────────────────────\nNur Buchstaben oder mit Zahlen?",
+        "btn_letters": "Nur Buchstaben 🔤",
+        "btn_numbers": "Mit Zahlen 🔢",
+        "searching": "🔍 Suche nach freien Namen (Länge: <b>{length}</b>)...",
         "search_results": "🎉 <b>Ergebnisse (Länge {length}):</b>\n─────────────────────\n{results}",
         "search_none": "❌ Keine freien Benutzernamen gefunden.",
         "btn_more": "🔄 Mehr (2)",
         "mon_prompt": "🔔 <b>Überwachung</b>\n─────────────────────\nBesetzten Benutzernamen eingeben:",
-        "settings_title": "⚙️ <b>Sprache ändern</b>\n─────────────────────\nWählen Sie Ihre Sprache:",
+        "mon_success": "✅ <b>Überwachung für <code>{username}</code> gestartet!</b>\nWir benachrichtigen Sie, sobald er frei wird.",
         "help_text": "ℹ️ <b>Hilfe</b>\n═════════════════════\nAutomatische Suche nach verfügbaren Telegram-Namen.",
         "lang_changed": "Sprache zu Deutsch geändert! ✅",
     },
@@ -97,12 +106,15 @@ TEXTS = {
         "btn_help": "ℹ️ 帮助",
         "btn_back": "« 返回菜单",
         "search_prompt": "🔍 <b>自动搜索用户名</b>\n─────────────────────\n选择字符长度（5 到 32）：",
-        "searching": "🔍 正在搜索长度为 <b>{length}</b> 的空闲用户名...",
+        "type_prompt": "⚙️ <b>用户名类型</b>\n─────────────────────\n您希望包含数字还是仅字母？",
+        "btn_letters": "仅字母 🔤",
+        "btn_numbers": "含数字 🔢",
+        "searching": "🔍 正在搜索 (长度: <b>{length}</b>)...",
         "search_results": "🎉 <b>搜索结果 (长度 {length}):</b>\n─────────────────────\n{results}",
         "search_none": "❌ 未找到空闲用户名，请重试！",
         "btn_more": "🔄 更多 (2)",
         "mon_prompt": "🔔 <b>监控</b>\n─────────────────────\n输入要监控的用户名：",
-        "settings_title": "⚙️ <b>语言选择</b>\n─────────────────────\n请选择您的语言：",
+        "mon_success": "✅ <b>已开始监控 <code>{username}</code>！</b>\n一旦释放我们将立即通知您。",
         "help_text": "ℹ️ <b>帮助</b>\n═════════════════════\n自动为您生成并检测可用的 Telegram 用户名。",
         "lang_changed": "语言已更改为中文！ ✅",
     }
@@ -114,8 +126,8 @@ def get_user_profile(user_id: int):
             "lang": "en",
             "saved": [],
             "history": [],
-            "checked_count": 0,
-            "available_count": 0,
+            "temp_length": 5,
+            "temp_use_numbers": True,
         }
     global_stats["unique_users"].add(user_id)
     return user_data_store[user_id]
@@ -162,6 +174,15 @@ def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def type_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t(user_id, "btn_letters"), callback_data="type:letters")],
+            [InlineKeyboardButton(text=t(user_id, "btn_numbers"), callback_data="type:numbers")],
+            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+        ]
+    )
+
 async def check_single_username(username: str) -> bool | None:
     username = username.lstrip("@").strip()
     if not USERNAME_PATTERN.match(username):
@@ -178,37 +199,52 @@ async def check_single_username(username: str) -> bool | None:
     except Exception:
         return None
 
-def analyze_username(username: str):
+def analyze_username(username: str, lang: str = "en"):
     clean = username.lstrip("@")
     has_nums = bool(re.search(r"\d", clean))
-    nums_str = "With numbers 🔢" if has_nums else "Letters only 🔤"
     
-    first_char = clean[0].lower()
-    vowels = "aeiou"
-    is_vowel = first_char in vowels
-    letter_type = "Vowel (Голосна)" if is_vowel else "Consonant (Приголосна)"
+    if lang == "ua":
+        nums_str = "З цифрами 🔢" if has_nums else "Лише букви 🔤"
+        first_char = clean[0].lower()
+        is_vowel = first_char in "aeiou"
+        letter_type = "Голосна" if is_vowel else "Приголосна"
+    elif lang == "de":
+        nums_str = "Mit Zahlen 🔢" if has_nums else "Nur Buchstaben 🔤"
+        first_char = clean[0].lower()
+        is_vowel = first_char in "aeiou"
+        letter_type = "Vokal" if is_vowel else "Konsonant"
+    elif lang == "zh":
+        nums_str = "含数字 🔢" if has_nums else "仅字母 🔤"
+        first_char = clean[0].lower()
+        is_vowel = first_char in "aeiou"
+        letter_type = "元音" if is_vowel else "辅音"
+    else:
+        nums_str = "With numbers 🔢" if has_nums else "Letters only 🔤"
+        first_char = clean[0].lower()
+        is_vowel = first_char in "aeiou"
+        letter_type = "Vowel" if is_vowel else "Consonant"
     
     length = len(clean)
-    if length <= 5 and not has_nums:
+    if length == 5 and not has_nums:
         rating = "5/5 ⭐⭐⭐⭐⭐"
-        price = "150 - 400 TON ($300 - $800)"
+        price = "100 - 300 TON ($250 - $700)"
     elif length == 6 and not has_nums:
         rating = "4.5/5 ⭐⭐⭐⭐✨"
-        price = "50 - 150 TON ($100 - $300)"
+        price = "30 - 90 TON ($70 - $200)"
     elif not has_nums:
         rating = "4/5 ⭐⭐⭐⭐"
-        price = "15 - 50 TON ($30 - $100)"
+        price = "10 - 30 TON ($25 - $70)"
     else:
         rating = "3/5 ⭐⭐⭐"
-        price = "5 - 15 TON ($10 - $30)"
+        price = "1 - 8 TON ($3 - $20)"
         
     return nums_str, letter_type, rating, price
 
-async def generate_and_find_free(length: int, count: int = 2) -> list:
-    chars = "abcdefghijklmnopqrstuvwxyz0123456789_"
+async def generate_and_find_free(length: int, use_numbers: bool, count: int = 2) -> list:
+    chars = "abcdefghijklmnopqrstuvwxyz0123456789_" if use_numbers else "abcdefghijklmnopqrstuvwxyz_"
     free_found = []
     attempts = 0
-    while len(free_found) < count and attempts < 25:
+    while len(free_found) < count and attempts < 30:
         attempts += 1
         first_char = random.choice("abcdefghijklmnopqrstuvwxyz")
         remaining = "".join(random.choice(chars) for _ in range(length - 1))
@@ -220,7 +256,7 @@ async def generate_and_find_free(length: int, count: int = 2) -> list:
         is_free = await check_single_username(candidate)
         if is_free is True:
             free_found.append(f"@{candidate}")
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.1)
     return free_found
 
 @dispatcher.message(CommandStart())
@@ -281,10 +317,24 @@ async def set_lang_callback(callback: CallbackQuery):
 async def length_selected_callback(callback: CallbackQuery):
     length = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
+    get_user_profile(user_id)["temp_length"] = length
+    
+    await callback.message.edit_text(t(user_id, "type_prompt"), reply_markup=type_keyboard(user_id), parse_mode="HTML")
+    await callback.answer()
+
+@dispatcher.callback_query(F.data.startswith("type:"))
+async def type_selected_callback(callback: CallbackQuery):
+    choice = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    profile = get_user_profile(user_id)
+    
+    profile["temp_use_numbers"] = (choice == "numbers")
+    length = profile.get("temp_length", 5)
+    lang = profile.get("lang", "en")
     
     await callback.message.edit_text(t(user_id, "searching", length=length), parse_mode="HTML")
     
-    free_list = await generate_and_find_free(length, count=2)
+    free_list = await generate_and_find_free(length, profile["temp_use_numbers"], count=2)
     
     if not free_list:
         text = t(user_id, "search_none")
@@ -293,7 +343,7 @@ async def length_selected_callback(callback: CallbackQuery):
         results_formatted = []
         keyboard_buttons = []
         for uname in free_list:
-            nums, l_type, rating, price = analyze_username(uname)
+            nums, l_type, rating, price = analyze_username(uname, lang)
             results_formatted.append(
                 f"🔹 <code>{uname}</code>\n"
                 f"   • Type: {nums} | {l_type}\n"
@@ -312,9 +362,23 @@ async def length_selected_callback(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
     await callback.answer()
 
+@dispatcher.message(BotStates.monitor_username)
+async def monitor_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    text_input = message.text.strip()
+    clean_uname = text_input.lstrip("@")
+    
+    if not USERNAME_PATTERN.match(clean_uname):
+        await message.answer("❌ Invalid username format. Please try again:")
+        return
+        
+    # Відповідь-підтвердження користувачу з локалізацією
+    success_msg = t(user_id, "mon_success", username=f"@{clean_uname}")
+    await message.answer(success_msg, reply_markup=back_keyboard(user_id), parse_mode="HTML")
+
 async def main():
     await dispatcher.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
+        
