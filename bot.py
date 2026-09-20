@@ -419,4 +419,4 @@ async def type_selected_callback(callback: CallbackQuery):
             ])
         
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-        keyboard_buttons.append([InlineKey
+        keyboard_buttons.append([InlineKey])
