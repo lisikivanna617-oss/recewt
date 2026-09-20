@@ -3,6 +3,7 @@ import html
 import logging
 import re
 import aiohttp
+import os
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
@@ -21,7 +22,8 @@ logging.basicConfig(
 )
 
 # === KEYS & CONFIG ===
-BOT_TOKEN = "8985383934:AAETY_Sx7prHAJf6xfH382Rw20aYMbXFapc"
+# Отримуємо токен безпечно зі змінної середовища Railway (або використовуємо запасний)
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8985383934:AAETY_Sx7prHAJf6xfH382Rw20aYMbXFapc")
 ADMIN_ID = 0  # Enter your numeric Telegram ID if needed
 
 bot = Bot(token=BOT_TOKEN)
@@ -199,7 +201,7 @@ TEXTS = {
         "free_res": "🎯 <b>查询结果</b>\n─────────────────────\n用户名: <code>@{u}</code>\n状态: 🟢 <b>未被占用 (可注册)</b>",
         "taken_res": "🎯 <b>查询结果</b>\n─────────────────────\n用户名: <code>@{u}</code>\n状态: 🔴 <b>已被占用</b>",
         "invalid": "⚠️ 用户名格式错误或网络连接超时。",
-        "gen_prompt": "🎲 <b>品牌灵感生成</b>\n─────────────────────\n请输入基础词汇或品牌名:",
+        "gen_prompt": "🎲 <b>品牌灵感生成</b>\n─────────────────────\请输入基础词汇或品牌名:",
         "gen_loading": "🎲 <i>正在生成并匹配...</i>",
         "gen_found": "💡 <b>找到可用的用户名:</b>\n─────────────────────\n\n{items}",
         "gen_none": "😔 未找到可用组合，请尝试其他词汇！",
@@ -236,7 +238,7 @@ LANG_NAMES = {
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",  # English by default
+            "lang": "ua",  # Ставимо українську за замовчуванням
             "saved": [],
             "history": [],
             "checked_count": 0,
@@ -246,8 +248,8 @@ def get_user_profile(user_id: int):
     return user_data_store[user_id]
 
 def t(user_id: int, key: str, **kwargs) -> str:
-    lang = get_user_profile(user_id).get("lang", "en")
-    template = TEXTS.get(lang, TEXTS["en"]).get(key, TEXTS["en"].get(key, ""))
+    lang = get_user_profile(user_id).get("lang", "ua")
+    template = TEXTS.get(lang, TEXTS["ua"]).get(key, TEXTS["ua"].get(key, ""))
     return template.format(**kwargs)
 
 # --- STATES ---
@@ -292,21 +294,6 @@ def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[[InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")]]
     )
 
-def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🇬🇧 English", callback_data="setlang:en"),
-                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="setlang:ua"),
-            ],
-            [
-                InlineKeyboardButton(text="🇩🇪 Deutsch", callback_data="setlang:de"),
-                InlineKeyboardButton(text="🇨🇳 中文", callback_data="setlang:zh"),
-            ],
-            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
-        ]
-    )
-
 # --- HTTP USERNAME CHECKER ---
 async def check_single_username(username: str) -> bool | None:
     username = username.lstrip("@").strip()
@@ -342,8 +329,19 @@ async def monitoring_worker():
                 del monitored_usernames[username]
 
 # --- HANDLERS ---
-
 @dispatcher.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    await message.answer("Привіт! Бот успішно запущено!")
-    
+    await state.clear()
+    user_id = message.from_user.id
+    name = html.escape(message.from_user.first_name)
+    text = t(user_id, "welcome", name=name)
+    await message.answer(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+
+# Головна функція для запуску
+async def main():
+    asyncio.create_task(monitoring_worker())
+    await dispatcher.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+        
