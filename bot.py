@@ -31,7 +31,6 @@ dispatcher = Dispatcher()
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
 user_data_store = {}
-monitored_usernames = {}
 global_stats = {
     "total_checked": 0,
     "total_available": 0,
@@ -419,4 +418,4 @@ async def type_selected_callback(callback: CallbackQuery):
             ])
         
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-        keyboard_buttons.append([InlineKey])
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_i
