@@ -27,8 +27,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     logging.error("❌ ПРИМИЛКА: Змінна BOT_TOKEN не знайдена в оточенні Railway!")
 
-ADMIN_ID = 0  # Впишіть ваш Telegram ID за потреби
-
+ADMIN_ID = 0  # 5619415334
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dispatcher = Dispatcher()
 
@@ -430,4 +429,16 @@ async def type_selected_callback(callback: CallbackQuery):
                 f"   • Est. Price: <b>{price}</b>"
             )
             keyboard_buttons.append([
-                InlineK
+                InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
+                InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
+            ])
+        
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+        
+        results_text = "\n\n".join(results_formatted)
+        text = t(user_id, "search_results", length=length, results=results_text)
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+    await safe_edit_text(callback, text, reply_markup=markup)
+    
