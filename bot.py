@@ -337,11 +337,16 @@ async def cmd_start(message: Message, state: FSMContext):
     text = t(user_id, "welcome", name=name)
     await message.answer(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
 
-# Головна функція для запуску
+# === СЮДИ ВСТАВЛЯЄШ НОВІ ОБРОБНИКИ КНОПОК (що я дарував вище) ===
+@dispatcher.callback_query(F.data.startswith("menu:"))
+async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
+    # ... весь код обробки кнопок ...
+
+# --- ГОЛОВНА ФУНКЦІЯ ---
 async def main():
     asyncio.create_task(monitoring_worker())
     await dispatcher.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-        
+    
