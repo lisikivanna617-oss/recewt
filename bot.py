@@ -42,16 +42,17 @@ TEXTS = {
         "welcome": "👋 <b>Welcome, {name}!</b>\n═════════════════════\n<b>USERNAME FIX</b> — automated Telegram username finder & monitor.\n\n👇 <i>Select an option below:</i>",
         "btn_search": "🔍 Auto-Search Free",
         "btn_mon": "🔔 Monitor",
-        "btn_settings": "Зміна мови 🌍",
+        "btn_settings": "Change Language 🌍",
         "btn_help": "ℹ️ Help",
         "btn_back": "« Back to Menu",
         "search_prompt": "🔍 <b>Auto-Search Usernames</b>\n─────────────────────\nSelect the desired username length (from 5 to 32 characters):",
         "searching": "🔍 Searching for free usernames of length <b>{length}</b>... Please wait ⏳",
-        "search_results": "🎉 <b>Search Results (Length {length}):</b>\n─────────────────────\n{results}\n\n<i>Want more? Click below!</i>",
+        "search_results": "🎉 <b>Found Usernames (Length {length}):</b>\n─────────────────────\n{results}\n\n<i>Click the buttons below to open/claim or load more!</i>",
         "search_none": "❌ No free usernames found in this batch. Try again!",
+        "btn_more": "🔄 Load More (2)",
         "mon_prompt": "🔔 <b>Monitoring</b>\n─────────────────────\nSend a taken username to track:",
         "settings_title": "⚙️ <b>Language Selection</b>\n─────────────────────\nChoose your interface language:",
-        "help_text": "ℹ️ <b>Help</b>\n═════════════════════\nThis bot automatically generates and scans for available Telegram usernames based on your length criteria.",
+        "help_text": "ℹ️ <b>Help</b>\n═════════════════════\nThis bot automatically generates and scans for available Telegram usernames based on your criteria.",
         "lang_changed": "Language successfully changed to English! ✅",
     },
     "ua": {
@@ -63,8 +64,9 @@ TEXTS = {
         "btn_back": "« Повернутися в меню",
         "search_prompt": "🔍 <b>Авто-пошук юзернеймів</b>\n─────────────────────\nОберіть бажану кількість символів (від 5 до 32):",
         "searching": "🔍 Шукаємо вільні юзернейми довжиною <b>{length}</b>... Зачекайте⏳",
-        "search_results": "🎉 <b>Результати пошуку (Довжина {length}):</b>\n─────────────────────\n{results}\n\n<i>Бажаєте ще? Натисніть нижче!</i>",
+        "search_results": "🎉 <b>Знайдені юзернейми (Довжина {length}):</b>\n─────────────────────\n{results}\n\n<i>Натисніть на кнопки нижче, щоб відкрити юзернейм, або знайдіть ще!</i>",
         "search_none": "❌ У цій спробі вільних юзернеймів не знайдено. Спробуйте ще раз!",
+        "btn_more": "🔄 Більше (2)",
         "mon_prompt": "🔔 <b>Моніторинг</b>\n─────────────────────\nВведіть зайнятий юзернейм:",
         "settings_title": "⚙️ <b>Зміна мови</b>\n─────────────────────\nОберіть мову інтерфейсу:",
         "help_text": "ℹ️ <b>Довідка</b>\n═════════════════════\nБот автоматично генерує та перевіряє вільні Telegram юзернейми.",
@@ -74,13 +76,14 @@ TEXTS = {
         "welcome": "👋 <b>Willkommen, {name}!</b>\n═════════════════════\n<b>USERNAME FIX</b> — Automatisierte Benutzernamen-Suche.\n\n👇 <i>Wählen Sie eine Option:</i>",
         "btn_search": "🔍 Freie Suchen",
         "btn_mon": "🔔 Überwachen",
-        "btn_settings": "Зміна мови 🌍",
+        "btn_settings": "Sprache ändern 🌍",
         "btn_help": "ℹ️ Hilfe",
         "btn_back": "« Zurück zum Menü",
         "search_prompt": "🔍 <b>Benutzernamen-Suche</b>\n─────────────────────\nWählen Sie die Länge (5 bis 32 Zeichen):",
         "searching": "🔍 Suche nach freien Namen mit Länge <b>{length}</b>...",
         "search_results": "🎉 <b>Ergebnisse (Länge {length}):</b>\n─────────────────────\n{results}",
         "search_none": "❌ Keine freien Benutzernamen gefunden.",
+        "btn_more": "🔄 Mehr (2)",
         "mon_prompt": "🔔 <b>Überwachung</b>\n─────────────────────\nBesetzten Benutzernamen eingeben:",
         "settings_title": "⚙️ <b>Sprache ändern</b>\n─────────────────────\nWählen Sie Ihre Sprache:",
         "help_text": "ℹ️ <b>Hilfe</b>\n═════════════════════\nAutomatische Suche nach verfügbaren Telegram-Namen.",
@@ -90,13 +93,14 @@ TEXTS = {
         "welcome": "👋 <b>欢迎, {name}!</b>\n═════════════════════\n<b>USERNAME FIX</b> — 自动用户名搜索与监控。\n\n👇 <i>请选择：</i>",
         "btn_search": "🔍 自动搜索空闲",
         "btn_mon": "🔔 监控",
-        "btn_settings": "Зміна мови 🌍",
+        "btn_settings": "更改语言 🌍",
         "btn_help": "ℹ️ 帮助",
         "btn_back": "« 返回菜单",
         "search_prompt": "🔍 <b>自动搜索用户名</b>\n─────────────────────\n选择字符长度（5 到 32）：",
         "searching": "🔍 正在搜索长度为 <b>{length}</b> 的空闲用户名...",
         "search_results": "🎉 <b>搜索结果 (长度 {length}):</b>\n─────────────────────\n{results}",
         "search_none": "❌ 未找到空闲用户名，请重试！",
+        "btn_more": "🔄 更多 (2)",
         "mon_prompt": "🔔 <b>监控</b>\n─────────────────────\n输入要监控的用户名：",
         "settings_title": "⚙️ <b>语言选择</b>\n─────────────────────\n请选择您的语言：",
         "help_text": "ℹ️ <b>帮助</b>\n═════════════════════\n自动为您生成并检测可用的 Telegram 用户名。",
@@ -146,7 +150,6 @@ def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
     )
 
 def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    # Клавіатура для вибору довжини від 5 до 12 (або інші популярні) + кнопка назад
     buttons = []
     row = []
     for length in range(5, 13):
@@ -175,26 +178,52 @@ async def check_single_username(username: str) -> bool | None:
     except Exception:
         return None
 
-# Генератор випадкових юзернеймів заданої довжини
-async def generate_and_find_free(length: int, count: int = 5) -> list:
+# Аналіз характеристик юзернейму та оцінка
+def analyze_username(username: str):
+    clean = username.lstrip("@")
+    has_nums = bool(re.search(r"\d", clean))
+    nums_text = "З цифрами 🔢" if has_nums, "Лише букви 🔤" #через кортеж/умову
+    nums_str = "With numbers 🔢" if has_nums else "Letters only 🔤"
+    
+    first_char = clean[0].lower()
+    vowels = "aeiou"
+    is_vowel = first_char in vowels
+    letter_type = "Vowel (Голосна)" if is_vowel else "Consonant (Приголосна)"
+    
+    # Оцінка та ціна залежно від довжини та наявності цифр
+    length = len(clean)
+    if length <= 5 and not has_nums:
+        rating = "5/5 ⭐⭐⭐⭐⭐"
+        price = "150 - 400 TON ($300 - $800)"
+    elif length == 6 and not has_nums:
+        rating = "4.5/5 ⭐⭐⭐⭐✨"
+        price = "50 - 150 TON ($100 - $300)"
+    elif not has_nums:
+        rating = "4/5 ⭐⭐⭐⭐"
+        price = "15 - 50 TON ($30 - $100)"
+    else:
+        rating = "3/5 ⭐⭐⭐"
+        price = "5 - 15 TON ($10 - $30)"
+        
+    return nums_str, letter_type, rating, price
+
+async def generate_and_find_free(length: int, count: int = 2) -> list:
     chars = "abcdefghijklmnopqrstuvwxyz0123456789_"
     free_found = []
     attempts = 0
-    while len(free_found) < count and attempts < 30:
+    while len(free_found) < count and attempts < 25:
         attempts += 1
-        # Перший символ обов'язково літера
         first_char = random.choice("abcdefghijklmnopqrstuvwxyz")
         remaining = "".join(random.choice(chars) for _ in range(length - 1))
         candidate = first_char + remaining
         
-        # Перевіряємо унікальність/валіदність
         if candidate in [f.lstrip("@") for f in free_found]:
             continue
             
         is_free = await check_single_username(candidate)
         if is_free is True:
             free_found.append(f"@{candidate}")
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
     return free_found
 
 @dispatcher.message(CommandStart())
@@ -251,7 +280,6 @@ async def set_lang_callback(callback: CallbackQuery):
     await callback.message.edit_text(t(user_id, "settings_title"), reply_markup=settings_keyboard(user_id), parse_mode="HTML")
     await callback.answer(t(user_id, "lang_changed"))
 
-# Обробка вибору довжини для авто-пошуку
 @dispatcher.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
     length = int(callback.data.split(":")[1])
@@ -259,15 +287,34 @@ async def length_selected_callback(callback: CallbackQuery):
     
     await callback.message.edit_text(t(user_id, "searching", length=length), parse_mode="HTML")
     
-    free_list = await generate_and_find_free(length, count=5)
+    free_list = await generate_and_find_free(length, count=2)
     
     if not free_list:
-        results_text = t(user_id, "search_none")
+        text = t(user_id, "search_none")
+        markup = length_keyboard(user_id)
     else:
-        results_text = "\n".join([f"▫️ <code>{item}</code>" for item in free_list])
-    
-    text = t(user_id, "search_results", length=length, results=results_text)
-    await callback.message.edit_text(text, reply_markup=length_keyboard(user_id), parse_mode="HTML")
+        results_formatted = []
+        keyboard_buttons = []
+        for uname in free_list:
+            nums, l_type, rating, price = analyze_username(uname)
+            results_formatted.append(
+                f"🔹 <code>{uname}</code>\n"
+                f"   • Type: {nums} | {l_type}\n"
+                f"   • Rating: {rating}\n"
+                f"   • Est. Price: <b>{price}</b>"
+            )
+            # Кнопка безпосередньо з посиланням на юзернейм
+            keyboard_buttons.append([InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}")])
+        
+        # Кнопка пошуку наступних 2 юзернеймів + повернення
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+        
+        results_text = "\n\n".join(results_formatted)
+        text = t(user_id, "search_results", length=length, results=results_text)
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
     await callback.answer()
 
 async def main():
@@ -275,4 +322,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
+            
