@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 0  # 5619415334
+ADMIN_ID = 5619415334
 
 bot = Bot(token=BOT_TOKEN)
 dispatcher = Dispatcher()
@@ -37,7 +37,6 @@ global_stats = {
     "unique_users": set(),
 }
 
-# --- TRANSLATIONS ---
 TEXTS = {
     "en": {
         "welcome": "👋 <b>Welcome, {name}!</b>\n═════════════════════\n<b>USERNAME FIX</b> — automated Telegram username finder & monitor.\n\n👇 <i>Select an option below:</i>",
@@ -418,8 +417,6 @@ async def type_selected_callback(callback: CallbackQuery):
             ])
         
         keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-                keyboard_buttons.append([
-            InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
-            InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
-        ])
-    
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+        
+        results_text = "\n\n".j
