@@ -345,4 +345,5 @@ async def monitoring_worker():
 
 @dispatcher.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-   
+    await message.answer("Привіт! Бот успішно запущено!")
+    
