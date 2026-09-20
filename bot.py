@@ -1,13 +1,13 @@
 import asyncio
 import html
 import logging
+import os
 import random
 import re
 import aiohttp
-import os
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -16,6 +16,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
+from aiogram.exceptions import TelegramBadRequest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,9 +24,12 @@ logging.basicConfig(
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 5619415334
+if not BOT_TOKEN:
+    logging.error("❌ ПРИМИЛКА: Змінна BOT_TOKEN не знайдена в оточенні Railway!")
 
-bot = Bot(token=BOT_TOKEN)
+ADMIN_ID = 0  # Впишіть ваш Telegram ID за потреби
+
+bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dispatcher = Dispatcher()
 
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
@@ -219,6 +223,38 @@ def type_keyboard(user_id: int) -> InlineKeyboardMarkup:
         ]
     )
 
+def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🇬🇧 English", callback_data="setlang:en"),
+                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="setlang:ua"),
+            ],
+            [
+                InlineKeyboardButton(text="🇩🇪 Deutsch", callback_data="setlang:de"),
+                InlineKeyboardButton(text="🇨🇳 中文", callback_data="setlang:zh"),
+            ],
+            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+        ]
+    )
+
+async def safe_edit_text(callback: CallbackQuery, text: str, reply_markup=None):
+    """Безпечне оновлення тексту повідомлення без падіння бота"""
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+            disable_web_page_preview=True
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            logging.warning(f"TelegramBadRequest: {e}")
+    except Exception as e:
+        logging.error(f"Error editing message: {e}")
+
 async def check_single_username(username: str) -> bool | None:
     username = username.lstrip("@").strip()
     if not USERNAME_PATTERN.match(username):
@@ -300,7 +336,8 @@ async def generate_and_find_free(length: int, use_numbers: bool, count: int = 2)
         await asyncio.sleep(0.1)
     return free_found
 
-@dispatcher.message(CommandStart())
+# Обробник команд /start та /старт
+@dispatcher.message(Command("start", "старт"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
@@ -317,51 +354,31 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     if action == "main":
         name = html.escape(callback.from_user.first_name)
         text = t(user_id, "welcome", name=name)
-        await callback.message.edit_text(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
     elif action == "search":
         await state.set_state(BotStates.auto_search)
-        await callback.message.edit_text(t(user_id, "search_prompt"), reply_markup=length_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, t(user_id, "search_prompt"), reply_markup=length_keyboard(user_id))
     elif action == "monitor":
         await state.set_state(BotStates.monitor_username)
-        await callback.message.edit_text(t(user_id, "mon_prompt"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, t(user_id, "mon_prompt"), reply_markup=back_keyboard(user_id))
     elif action == "saved":
         profile = get_user_profile(user_id)
         saved_list = profile.get("saved", [])
         if not saved_list:
             saved_text = t(user_id, "saved_empty")
-            markup = back_keyboard(user_id)
         else:
-            items = []
-            for u in saved_list:
-                clean_u = u.lstrip("@")
-                items.append(f"🔹 <a href='https://t.me/{clean_u}'>{u}</a>")
+            items = [f"🔹 <a href='https://t.me/{u.lstrip('@')}'>{u}</a>" for u in saved_list]
             saved_text = t(user_id, "saved_title", list="\n".join(items))
-            markup = back_keyboard(user_id)
-        await callback.message.edit_text(saved_text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+        await safe_edit_text(callback, saved_text, reply_markup=back_keyboard(user_id))
     elif action == "feedback":
         await state.set_state(BotStates.waiting_feedback)
-        await callback.message.edit_text(t(user_id, "feedback_prompt"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, t(user_id, "feedback_prompt"), reply_markup=back_keyboard(user_id))
     elif action == "settings":
-        await callback.message.edit_text("⚙️ <b>Language Selection</b>\n─────────────────────\nChoose your interface language:", reply_markup=settings_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, "⚙️ <b>Language Selection</b>\n─────────────────────\nChoose your interface language:", reply_markup=settings_keyboard(user_id))
     elif action == "help":
-        await callback.message.edit_text(t(user_id, "help_text"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+        await safe_edit_text(callback, t(user_id, "help_text"), reply_markup=back_keyboard(user_id))
     
     await callback.answer()
-
-def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🇬🇧 English", callback_data="setlang:en"),
-                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="setlang:ua"),
-            ],
-            [
-                InlineKeyboardButton(text="🇩🇪 Deutsch", callback_data="setlang:de"),
-                InlineKeyboardButton(text="🇨🇳 中文", callback_data="setlang:zh"),
-            ],
-            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
-        ]
-    )
 
 @dispatcher.callback_query(F.data.startswith("setlang:"))
 async def set_lang_callback(callback: CallbackQuery):
@@ -371,7 +388,7 @@ async def set_lang_callback(callback: CallbackQuery):
     
     name = html.escape(callback.from_user.first_name)
     text = t(user_id, "welcome", name=name)
-    await callback.message.edit_text(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+    await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
     await callback.answer(t(user_id, "lang_changed"))
 
 @dispatcher.callback_query(F.data.startswith("len:"))
@@ -380,7 +397,7 @@ async def length_selected_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     get_user_profile(user_id)["temp_length"] = length
     
-    await callback.message.edit_text(t(user_id, "type_prompt"), reply_markup=type_keyboard(user_id), parse_mode="HTML")
+    await safe_edit_text(callback, t(user_id, "type_prompt"), reply_markup=type_keyboard(user_id))
     await callback.answer()
 
 @dispatcher.callback_query(F.data.startswith("type:"))
@@ -393,7 +410,8 @@ async def type_selected_callback(callback: CallbackQuery):
     length = profile.get("temp_length", 5)
     lang = profile.get("lang", "en")
     
-    await callback.message.edit_text(t(user_id, "searching", length=length), parse_mode="HTML")
+    await safe_edit_text(callback, t(user_id, "searching", length=length))
+    await callback.answer()
     
     free_list = await generate_and_find_free(length, profile["temp_use_numbers"], count=2)
     
@@ -412,11 +430,4 @@ async def type_selected_callback(callback: CallbackQuery):
                 f"   • Est. Price: <b>{price}</b>"
             )
             keyboard_buttons.append([
-                InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
-                InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
-            ])
-        
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
-        
-        results_text = "\n\n".j
+                InlineK
