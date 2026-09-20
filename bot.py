@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 0  # <--- ЗАБАЖАНО: Впишіть сюди ваш Telegram ID, щоб отримувати відгуки!
+ADMIN_ID = 0  # <--- Впишіть сюди ваш Telegram ID, щоб отримувати відгуки!
 
 bot = Bot(token=BOT_TOKEN)
 dispatcher = Dispatcher()
@@ -231,14 +231,11 @@ async def check_single_username(username: str) -> bool | None:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, timeout=5) as resp:
                 text = await resp.text()
-                # Якщо сторінка містить елементи профілю або каналу — юзернейм зайнятий
                 if "tgme_page_extra" in text or "tgme_page_title" in text:
                     if "If you have Telegram, you can contact" in text or "View in Telegram" in text or "tgme_user" in text or "tgme_channel" in text:
                         return False
-                # Перевірка на спеціальні ознаки вільності в Telegram
                 if "If you have Telegram, you can set up" in text or "is available on Telegram" in text:
                     return True
-                # Додатковий аналіз: якщо немає індикаторів зайнятості, перевіримо статус-код та наявність назви
                 if resp.status == 200 and "tgme_page" in text and "tgme_page_photo" not in text:
                     return True
                 return False
@@ -336,7 +333,11 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
             saved_text = t(user_id, "saved_empty")
             markup = back_keyboard(user_id)
         else:
-            items = [f"🔹 <a href='https://t.me/{u.lstrip(\"@\")}'>{u}</a>" for u in saved_list]
+            # Виправлено синтаксичну помилку з лапками
+            items = []
+            for u in saved_list:
+                clean_u = u.lstrip("@")
+                items.append(f"🔹 <a href='https://t.me/{clean_u}'>{u}</a>")
             saved_text = t(user_id, "saved_title", list="\n".join(items))
             markup = back_keyboard(user_id)
         await callback.message.edit_text(saved_text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
@@ -371,7 +372,6 @@ async def set_lang_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     get_user_profile(user_id)["lang"] = lang
     
-    # Виведемо оновлене меню на обраній мові
     name = html.escape(callback.from_user.first_name)
     text = t(user_id, "welcome", name=name)
     await callback.message.edit_text(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
@@ -414,6 +414,9 @@ async def type_selected_callback(callback: CallbackQuery):
                 f"   • Rating: {rating}\n"
                 f"   • Est. Price: <b>{price}</b>"
             )
-            # Кнопка відкриття та кнопка збереження
             keyboard_buttons.append([
-                InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}
+                InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
+                InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
+            ])
+        
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:
