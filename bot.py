@@ -333,7 +333,6 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
             saved_text = t(user_id, "saved_empty")
             markup = back_keyboard(user_id)
         else:
-            # Виправлено синтаксичну помилку з лапками
             items = []
             for u in saved_list:
                 clean_u = u.lstrip("@")
@@ -419,4 +418,5 @@ async def type_selected_callback(callback: CallbackQuery):
                 InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
             ])
         
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:
+        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
+        keyboard_buttons.append([InlineKey
