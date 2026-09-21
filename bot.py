@@ -100,7 +100,6 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
                 return False
             text = await resp.text()
             
-            # Telegram indicators for available/free usernames
             if "is available on Telegram" in text or "you can set up" in text or "username is not taken" in text:
                 return True
                 
@@ -112,10 +111,10 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
     except Exception:
         return False
 
-async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str = "", length: int = 6, count: int = 1) -> list:
+async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str = "", target_length: int = 6, count: int = 1) -> list:
     free_found = []
     attempts = 0
-    max_attempts = 60
+    max_attempts = 80
     
     steps = [
         ("┌ [ ⋯ ] initializing search... 25%", 25),
@@ -127,15 +126,14 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
     step_index = 0
     timeout = aiohttp.ClientTimeout(total=2)
     
-    # Використовуємо гарантовано робочі патерни комбінацій для швидкого знаходження вільних тегів
     letters = "abcdefghijklmnopqrstuvwxyz"
-    suffixes_pool = ["_fx", "_99", "_io", "_hq", "_dev", "_tg", "x7", "01", "_bot", "aa", "zz"]
+    chars_pool = "abcdefghijklmnopqrstuvwxyz0123456789_"
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
         while len(free_found) < count and attempts < max_attempts:
             attempts += 1
             
-            if attempts % 15 == 0 and step_index < len(steps):
+            if attempts % 20 == 0 and step_index < len(steps):
                 try:
                     text, _ = steps[step_index]
                     await message_to_edit.edit_text(text, parse_mode="HTML")
@@ -144,20 +142,23 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
                     pass
 
             if prefix or suffix:
-                rand_part = "".join(random.choice(letters) for _ in range(max(2, length - len(prefix) - len(suffix))))
-                candidate = f"{prefix}{rand_part}{suffix}".lower()
+                fixed_len = len(prefix) + len(suffix)
+                if fixed_len >= target_length:
+                    candidate = f"{prefix}{suffix}"[:target_length]
+                else:
+                    rand_len = target_length - fixed_len
+                    rand_part = "".join(random.choice(chars_pool) for _ in range(rand_len))
+                    candidate = f"{prefix}{rand_part}{suffix}"
             else:
-                base_word = "".join(random.choice(letters) for _ in range(random.randint(3, 5)))
-                suf = random.choice(suffixes_pool)
-                candidate = f"{base_word}{suf}".lower()
+                # Генерація суворо заданої довжини (target_length)
+                first_char = random.choice(letters)
+                rest_len = target_length - 1
+                rest_part = "".join(random.choice(chars_pool) for _ in range(rest_len))
+                candidate = first_char + rest_part
 
-            if not candidate[0].isalpha():
-                candidate = "a" + candidate[1:]
-                
-            if len(candidate) < 5:
-                candidate = candidate + "x" * (5 - len(candidate))
-            if len(candidate) > 32:
-                candidate = candidate[:32]
+            # Перевірка валідності за правилами Telegram
+            if not USERNAME_PATTERN.match(candidate):
+                continue
 
             if f"@{candidate}" in free_found:
                 continue
@@ -165,7 +166,7 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
             if await check_single_username(session, candidate):
                 free_found.append(f"@{candidate}")
                 
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.03)
             
     return free_found
 
@@ -190,6 +191,7 @@ def format_result_card(username: str) -> str:
         f"┌─[ status: found ]\n"
         f"│\n"
         f"├ target: <code>{username}</code>\n"
+        f"├ length: {length} chars\n"
         f"├ readability: {readability}/10\n"
         f"├ approximate price: {price}\n"
         f"├ liquidity: {liquidity}/10\n"
@@ -200,7 +202,6 @@ def format_result_card(username: str) -> str:
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    user_id = message.from_user.id
     name = html.escape(message.from_user.first_name)
     text = f"┌─[ tag track system ]\n│\n├ welcome, {name}!\n└ choose an action below:"
     await message.answer(text, reply_markup=main_keyboard(), parse_mode="HTML")
@@ -219,12 +220,12 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         
     elif action == "auto":
         await state.set_state(BotStates.auto_search)
-        text = "┌─[ auto-search ]\n└ select length (5-11):"
+        text = "┌─[ auto-search ]\n└ select exact length (5-11):"
         await callback.message.edit_text(text, reply_markup=length_keyboard(), parse_mode="HTML")
         
     elif action == "prefix":
         await state.set_state(BotStates.prefix_search)
-        text = "┌─[ prefix / suffix ]\n└ enter text:"
+        text = "┌─[ prefix / suffix ]\n└ enter text or prefix:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "smart":
@@ -272,7 +273,7 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "help":
-        text = "┌─[ help ]\n└ use auto-search or prefixes to find available tags."
+        text = "┌─[ help ]\n└ select desired exact length or prefix to find free tags."
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     await callback.answer()
@@ -283,14 +284,14 @@ async def length_selected_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     profile = get_user_profile(user_id)
     
-    msg = await callback.message.edit_text("┌ [ ⋯ ] initializing...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, length=length, count=1)
+    msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag...", parse_mode="HTML")
+    results = await generate_and_find_free(message_to_edit=msg, target_length=length, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ error ]\n└ no free tags found, try again."
+        err_text = "┌─[ error ]\n└ no free tags found for this length, try again."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
 
@@ -327,9 +328,14 @@ async def process_prefix_search(message: Message, state: FSMContext):
     prefix = message.text.strip().lstrip("@")
     await state.clear()
     
+    # Визначаємо цільову довжину як довжину префікса + мінімум 2 символи, але не менше 5 загалом
+    target_len = max(5, len(prefix) + 2)
+    if target_len > 32:
+        target_len = 32
+        
     profile = get_user_profile(user_id)
-    msg = await message.answer("┌ [ ⋯ ] initializing...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, length=len(prefix) + 4, count=1)
+    msg = await message.answer("┌ [ ⋯ ] searching with prefix...", parse_mode="HTML")
+    results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, target_length=target_len, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
@@ -361,13 +367,21 @@ async def process_smart_variations(message: Message, state: FSMContext):
     
     profile = get_user_profile(user_id)
     msg = await message.answer("┌ [ ⋯ ] analyzing variations...", parse_mode="HTML")
-    variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
+    
+    # Робимо варіанти, які відповідають мінімальній довжині 5
+    raw_variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
+    variations = []
+    for v in raw_variations:
+        if len(v) < 5:
+            v = v + "x" * (5 - len(v))
+        if len(v) <= 32 and v not in variations:
+            variations.append(v)
     
     free_found = []
     timeout = aiohttp.ClientTimeout(total=2)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         for var in variations:
-            if await check_single_username(session, var):
+            if USERNAME_PATTERN.match(var) and await check_single_username(session, var):
                 free_found.append(f"@{var}")
                 break
                 
@@ -399,4 +413,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-                                
+    
