@@ -85,6 +85,26 @@ def length_keyboard() -> InlineKeyboardMarkup:
     buttons.append([InlineKeyboardButton(text="‹ Back", callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def digits_choice_keyboard(length: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="[ Yes (with digits) ]", callback_data=f"digits:yes:{length}"),
+            InlineKeyboardButton(text="[ No (letters/_) ]", callback_data=f"digits:no:{length}")
+        ],
+        [InlineKeyboardButton(text="‹ Back", callback_data="menu:auto")]
+    ])
+
+def digits_count_keyboard(length: int) -> InlineKeyboardMarkup:
+    buttons = []
+    row = []
+    max_d = min(3, length - 1) # Максимум цифр не може перевищувати довжину мінус 1 (щоб залишилась хоча б 1 літера на початку)
+    for d in range(1, max_d + 1):
+        row.append(InlineKeyboardButton(text=f"[{d} digit(s)]", callback_data=f"dcount:{length}:{d}"))
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="‹ Back", callback_data=f"len:{length}")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 async def check_single_username(session: aiohttp.ClientSession, username: str) -> bool:
     username = username.lstrip("@").strip()
     if not USERNAME_PATTERN.match(username):
@@ -111,10 +131,10 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
     except Exception:
         return False
 
-async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str = "", target_length: int = 6, count: int = 1) -> list:
+async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str = "", target_length: int = 6, use_digits: bool = True, digits_count: int = 1, count: int = 1) -> list:
     free_found = []
     attempts = 0
-    max_attempts = 80
+    max_attempts = 100
     
     steps = [
         ("┌ [ ⋯ ] initializing search... 25%", 25),
@@ -127,13 +147,15 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
     timeout = aiohttp.ClientTimeout(total=2)
     
     letters = "abcdefghijklmnopqrstuvwxyz"
-    chars_pool = "abcdefghijklmnopqrstuvwxyz0123456789_"
+    digits = "0123456789"
+    symbols_no_digits = "abcdefghijklmnopqrstuvwxyz_"
+    symbols_with_digits = "abcdefghijklmnopqrstuvwxyz0123456789_"
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
         while len(free_found) < count and attempts < max_attempts:
             attempts += 1
             
-            if attempts % 20 == 0 and step_index < len(steps):
+            if attempts % 25 == 0 and step_index < len(steps):
                 try:
                     text, _ = steps[step_index]
                     await message_to_edit.edit_text(text, parse_mode="HTML")
@@ -147,16 +169,33 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
                     candidate = f"{prefix}{suffix}"[:target_length]
                 else:
                     rand_len = target_length - fixed_len
-                    rand_part = "".join(random.choice(chars_pool) for _ in range(rand_len))
+                    pool = symbols_with_digits if use_digits else symbols_no_digits
+                    rand_part = "".join(random.choice(pool) for _ in range(rand_len))
                     candidate = f"{prefix}{rand_part}{suffix}"
             else:
-                # Генерація суворо заданої довжини (target_length)
+                # Суворий генератор точної довжини з урахуванням наявності чи відсутності цифр
                 first_char = random.choice(letters)
-                rest_len = target_length - 1
-                rest_part = "".join(random.choice(chars_pool) for _ in range(rest_len))
-                candidate = first_char + rest_part
+                
+                if use_digits and digits_count > 0:
+                    rest_len = target_length - 1
+                    # Вибираємо позиції для цифр у середині/кінці
+                    chosen_digits_count = min(digits_count, rest_len)
+                    chosen_letters_count = rest_len - chosen_digits_count
+                    
+                    r_letters = "".join(random.choice(symbols_no_digits) for _ in range(chosen_letters_count))
+                    r_digits = "".join(random.choice(digits) for _ in range(chosen_digits_count))
+                    
+                    rest_pool = list(r_letters + r_digits)
+                    random.shuffle(rest_pool)
+                    candidate = first_char + "".join(rest_pool)
+                else:
+                    rest_len = target_length - 1
+                    rest_part = "".join(random.choice(symbols_no_digits) for _ in range(rest_len))
+                    candidate = first_char + rest_part
 
-            # Перевірка валідності за правилами Telegram
+            if len(candidate) != target_length:
+                continue
+
             if not USERNAME_PATTERN.match(candidate):
                 continue
 
@@ -273,7 +312,7 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "help":
-        text = "┌─[ help ]\n└ select desired exact length or prefix to find free tags."
+        text = "┌─[ help ]\n└ select length, choose if digits are needed, and find free tags."
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     await callback.answer()
@@ -281,17 +320,64 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
     length = int(callback.data.split(":")[1])
+    text = f"┌─[ auto-search ]\n├ length: {length} chars\n└ use digits (0-9)?"
+    await callback.message.edit_text(text, reply_markup=digits_choice_keyboard(length), parse_mode="HTML")
+
+@dp.callback_query(F.data.startswith("digits:"))
+async def digits_choice_callback(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    choice = parts[1]
+    length = int(parts[2])
     user_id = callback.from_user.id
     profile = get_user_profile(user_id)
     
-    msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, target_length=length, count=1)
+    if choice == "yes":
+        # Переходимо до вибору кількості цифр (від 1 до 3)
+        text = f"┌─[ auto-search ]\n├ length: {length} chars\n└ select number of digits (1-3):"
+        await callback.message.edit_text(text, reply_markup=digits_count_keyboard(length), parse_mode="HTML")
+    else:
+        # Без цифр — одразу запускаємо пошук
+        msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag (no digits)...", parse_mode="HTML")
+        results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=False, count=1)
+        
+        profile["checks_count"] += 1
+        add_to_history(user_id, results)
+        
+        if not results:
+            err_text = "┌─[ error ]\n└ no free tags found for this length, try again."
+            await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
+            return
+
+        username = results[0]
+        clean_u = username.lstrip('@')
+        text = format_result_card(username)
+        
+        buttons = [
+            [
+                InlineKeyboardButton(text="[ ↗ open ]", url=f"https://t.me/{clean_u}"),
+                InlineKeyboardButton(text="[ ★ save ]", callback_data=f"save:{clean_u}")
+            ],
+            [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+        ]
+        
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
+
+@dp.callback_query(F.data.startswith("dcount:"))
+async def digits_count_callback(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    length = int(parts[1])
+    d_count = int(parts[2])
+    user_id = callback.from_user.id
+    profile = get_user_profile(user_id)
+    
+    msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag with {d_count} digit(s)...", parse_mode="HTML")
+    results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=True, digits_count=d_count, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ error ]\n└ no free tags found for this length, try again."
+        err_text = "┌─[ error ]\n└ no free tags found with these parameters, try again."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
 
@@ -328,14 +414,13 @@ async def process_prefix_search(message: Message, state: FSMContext):
     prefix = message.text.strip().lstrip("@")
     await state.clear()
     
-    # Визначаємо цільову довжину як довжину префікса + мінімум 2 символи, але не менше 5 загалом
     target_len = max(5, len(prefix) + 2)
     if target_len > 32:
         target_len = 32
         
     profile = get_user_profile(user_id)
     msg = await message.answer("┌ [ ⋯ ] searching with prefix...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, target_length=target_len, count=1)
+    results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, target_length=target_len, use_digits=True, digits_count=1, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
@@ -368,7 +453,6 @@ async def process_smart_variations(message: Message, state: FSMContext):
     profile = get_user_profile(user_id)
     msg = await message.answer("┌ [ ⋯ ] analyzing variations...", parse_mode="HTML")
     
-    # Робимо варіанти, які відповідають мінімальній довжині 5
     raw_variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
     variations = []
     for v in raw_variations:
