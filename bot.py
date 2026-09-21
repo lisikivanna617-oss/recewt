@@ -23,16 +23,20 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-# Створення бота та диспетчера
-BOT_TOKEN = "8985383934:AAFaZSgFxHBC1kJ1hGBsupEMHiMHpHilYhY"
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+# Отримання токена зі змінних оточення Railway (Variables)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-ADMIN_ID = 0  # 5619415334
+if not BOT_TOKEN:
+    logging.error("BOT_TOKEN не знайдено у Variables Railway!")
 
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
-dispatcher = Dispatcher()
+dp = Dispatcher()
 
+# Налаштування каналу для обов'язкової підписки
+CHANNEL_USERNAME = "@usernamingFix"
+CHANNEL_URL = "https://t.me/usernamingFix"
+
+ADMIN_ID = 5619415334
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
 user_data_store = {}
@@ -57,7 +61,7 @@ TEXTS = {
         "btn_letters": "Letters Only 🔤",
         "btn_numbers": "With Numbers 🔢",
         "searching": "🔍 Searching for free usernames (Length: <b>{length}</b>)... Please wait ⏳",
-        "search_results": "🎉 <b>Found Free Usernames (Length {length}):</b>\n─────────────────────\n{results}\n\n<i>Click the buttons below to open, save, or load more!</i>",
+        "search_results": "🎉 <b>Found Free Usernames (Length {length}):</b>\n─────────────────────\n{results}\n\n<i>Click the buttons below to open or load more!</i>",
         "search_none": "❌ No free usernames found in this batch. Try again!",
         "btn_more": "🔄 Load More (2)",
         "mon_prompt": "🔔 <b>Monitoring</b>\n─────────────────────\nSend a taken username to track:",
@@ -84,8 +88,8 @@ TEXTS = {
         "type_prompt": "⚙️ <b>Вміст юзернейму</b>\n─────────────────────\nБажаєте шукати з цифрами чи лише букви?",
         "btn_letters": "Лише букви 🔤",
         "btn_numbers": "З цифрами 🔢",
-        "searching": "🔍 Шукаємо вільні юзернейми (Довжина: <b>{length}</b>)... Зачекайте⏳",
-        "search_results": "🎉 <b>Знайдені вільні юзернейми (Довжина {length}):</b>\n─────────────────────\n{results}\n\n<i>Натисніть на кнопки нижче, щоб відкрити, зберегти або знайти ще!</i>",
+        "searching": "🔍 Шукаємо вільні юзернейми (Довжина: <b>{length}</b>)... Зачекайте ⏳",
+        "search_results": "🎉 <b>Знайдені вільні юзернейми (Довжина {length}):</b>\n─────────────────────\n{results}\n\n<i>Натисніть на кнопки нижче, щоб відкрити або знайти ще!</i>",
         "search_none": "❌ У цій спробі вільних юзернеймів не знайдено. Спробуйте ще раз!",
         "btn_more": "🔄 Більше (2)",
         "mon_prompt": "🔔 <b>Моніторинг</b>\n─────────────────────\nВведіть зайнятий юзернейм:",
@@ -157,10 +161,28 @@ TEXTS = {
     }
 }
 
+async def is_subscribed(user_id: int) -> bool:
+    """Перевірка чи підписаний користувач на канал."""
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        return member.status in ["creator", "administrator", "member"]
+    except Exception as e:
+        logging.warning(f"Не вдалося перевірити підписку: {e}")
+        return True
+
+def sub_keyboard() -> InlineKeyboardMarkup:
+    """Клавіатура для обов'язкової підписки."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📢 Підписатися на канал", url=CHANNEL_URL)],
+            [InlineKeyboardButton(text="✅ Перевірити підписку", callback_data="check_sub")]
+        ]
+    )
+
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",  # Англійська мова за замовчуванням для нових користувачів
+            "lang": "en",
             "saved": [],
             "temp_length": 5,
             "temp_use_numbers": True,
@@ -336,19 +358,49 @@ async def generate_and_find_free(length: int, use_numbers: bool, count: int = 2)
         await asyncio.sleep(0.1)
     return free_found
 
-@dispatcher.message(Command("start", "старт"))
+@dp.message(Command("start", "старт"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
+    
+    if not await is_subscribed(user_id):
+        await message.answer(
+            f"🚀 <b>Для використання бота, будь ласка, підпишіться на наш канал:</b>\n{CHANNEL_USERNAME}\n\n"
+            "Після підписки натисніть кнопку нижче 👇",
+            reply_markup=sub_keyboard(),
+            parse_mode="HTML"
+        )
+        return
+
     name = html.escape(message.from_user.first_name)
     text = t(user_id, "welcome", name=name)
     await message.answer(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
 
-@dispatcher.callback_query(F.data.startswith("menu:"))
+@dp.callback_query(F.data == "check_sub")
+async def check_sub_callback(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    if await is_subscribed(user_id):
+        await callback.answer("✅ Підписку підтверджено!")
+        name = html.escape(callback.from_user.first_name)
+        text = t(user_id, "welcome", name=name)
+        await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
+    else:
+        await callback.answer("❌ Ви все ще не підписалися на канал!", show_alert=True)
+
+@dp.callback_query(F.data.startswith("menu:"))
 async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    if not await is_subscribed(user_id):
+        await callback.answer("⚠️ Спочатку підпишіться на наш канал!", show_alert=True)
+        await safe_edit_text(
+            callback,
+            f"🚀 <b>Для використання бота, будь ласка, підпишіться на наш канал:</b>\n{CHANNEL_USERNAME}",
+            reply_markup=sub_keyboard()
+        )
+        return
+
     await state.clear()
     action = callback.data.split(":")[1]
-    user_id = callback.from_user.id
     
     if action == "main":
         name = html.escape(callback.from_user.first_name)
@@ -379,65 +431,5 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
 
-@dispatcher.callback_query(F.data.startswith("setlang:"))
-async def set_lang_callback(callback: CallbackQuery):
-    lang = callback.data.split(":")[1]
-    user_id = callback.from_user.id
-    get_user_profile(user_id)["lang"] = lang
-    
-    name = html.escape(callback.from_user.first_name)
-    text = t(user_id, "welcome", name=name)
-    await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
-    await callback.answer(t(user_id, "lang_changed"))
-
-@dispatcher.callback_query(F.data.startswith("len:"))
-async def length_selected_callback(callback: CallbackQuery):
-    length = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-    get_user_profile(user_id)["temp_length"] = length
-    
-    await safe_edit_text(callback, t(user_id, "type_prompt"), reply_markup=type_keyboard(user_id))
-    await callback.answer()
-
-@dispatcher.callback_query(F.data.startswith("type:"))
-async def type_selected_callback(callback: CallbackQuery):
-    choice = callback.data.split(":")[1]
-    user_id = callback.from_user.id
-    profile = get_user_profile(user_id)
-    
-    profile["temp_use_numbers"] = (choice == "numbers")
-    length = profile.get("temp_length", 5)
-    lang = profile.get("lang", "en")
-    
-    await safe_edit_text(callback, t(user_id, "searching", length=length))
-    await callback.answer()
-    
-    free_list = await generate_and_find_free(length, profile["temp_use_numbers"], count=2)
-    
-    if not free_list:
-        text = t(user_id, "search_none")
-        markup = length_keyboard(user_id)
-    else:
-        results_formatted = []
-        keyboard_buttons = []
-        
-        for uname in free_list:
-            clean_u = uname.lstrip("@")
-            nums, l_type, rating, price = analyze_username(uname, lang)
-            
-            results_formatted.append(
-                f"🔹 <code>{uname}</code>\n"
-                f"   • Type: {nums} | {l_type}\n"
-                f"   • Rating: {rating}\n"
-                f"   • Est. Price: <b>{price}</b>"
-            )
-            
-        # btn_open = Inline
-import asyncio
-
-async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+@dp.callback_query(F.data.startswith("setlang:"))
+async def set_la
