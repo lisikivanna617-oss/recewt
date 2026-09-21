@@ -25,9 +25,10 @@ logging.basicConfig(
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    logging.error("❌ ПРИМИЛКА: Змінна BOT_TOKEN не знайдена в оточенні Railway!")
+    logging.error("❌ ПОМИЛКА: Змінну BOT_TOKEN не знайдено в оточенні Railway!")
 
 ADMIN_ID = 0  # 5619415334
+
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dispatcher = Dispatcher()
 
@@ -158,7 +159,7 @@ TEXTS = {
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",
+            "lang": "en",  # Англійська мова за замовчуванням для нових користувачів
             "saved": [],
             "temp_length": 5,
             "temp_use_numbers": True,
@@ -238,7 +239,6 @@ def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
     )
 
 async def safe_edit_text(callback: CallbackQuery, text: str, reply_markup=None):
-    """Безпечне оновлення тексту повідомлення без падіння бота"""
     try:
         await callback.message.edit_text(
             text,
@@ -335,7 +335,6 @@ async def generate_and_find_free(length: int, use_numbers: bool, count: int = 2)
         await asyncio.sleep(0.1)
     return free_found
 
-# Обробник команд /start та /старт
 @dispatcher.message(Command("start", "старт"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
@@ -420,25 +419,16 @@ async def type_selected_callback(callback: CallbackQuery):
     else:
         results_formatted = []
         keyboard_buttons = []
+        
         for uname in free_list:
+            clean_u = uname.lstrip("@")
             nums, l_type, rating, price = analyze_username(uname, lang)
+            
             results_formatted.append(
                 f"🔹 <code>{uname}</code>\n"
                 f"   • Type: {nums} | {l_type}\n"
                 f"   • Rating: {rating}\n"
                 f"   • Est. Price: <b>{price}</b>"
             )
-            keyboard_buttons.append([
-                InlineKeyboardButton(text=f"🔗 Open {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
-                InlineKeyboardButton(text=f"{t(user_id, 'btn_save_prefix')}{uname}", callback_data=f"save:{uname}")
-            ])
-        
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data=f"len:{length}")])
-        keyboard_buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
-        
-        results_text = "\n\n".join(results_formatted)
-        text = t(user_id, "search_results", length=length, results=results_text)
-        markup = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-        
-    await safe_edit_text(callback, text, reply_markup=markup)
-    
+            
+            btn_open = Inline
