@@ -43,7 +43,7 @@ global_checked_usernames = set()
 
 TEXTS = {
     "en": {
-        "welcome": "👋 <b>Welcome to USERNAME FIX, {name}!</b>\n═════════════════════\nAutomated Telegram Username Finder & Generator.\n\n👇 <i>Choose an action below:</i>",
+        "welcome": "👋 <b>Welcome to Tag Track, {name}!</b>\n═════════════════════\nAutomated Telegram Username Finder & Generator.\n\n👇 <i>Choose an action below:</i>",
         "btn_auto_search": "🔍 Auto-Search",
         "btn_prefix_search": "🔤 Prefix / Suffix",
         "btn_smart_variations": "🧠 Smart Variations",
