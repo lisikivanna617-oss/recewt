@@ -20,12 +20,13 @@ from aiogram.exceptions import TelegramBadRequest
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    logging.error("❌ ПОМИЛКА: Змінну BOT_TOKEN не знайдено в оточенні Railway!")
+# Створення бота та диспетчера
+BOT_TOKEN = "8985383934:AAHjwPZD6varH8LkwHDzuTl4dHfyMjuVx1c"
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
 ADMIN_ID = 0  # 5619415334
 
