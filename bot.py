@@ -371,8 +371,12 @@ async def check_single_username(username: str) -> bool | None:
                 if "If you have Telegram, you can set up" in text or "is available on Telegram" in text:
                     return True
                 if resp.status == 200 and "tgme_page" in text and "tgme_page_photo" not in text:
-                    return True
-    def get_user_profile(user_id: int):
+                    async def is_subscribed(user_id: int) -> bool:
+    """Перевірка підписки вимкнена — доступ відкрито для всіх."""
+    return True
+
+
+def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
             "lang": "en",
