@@ -162,23 +162,37 @@ async def check_single_username(username: str) -> bool | None:
     except Exception:
         return None
 
-async def generate_and_find_free(prefix: str = "", suffix: str = "", length: int = 5, count: int = 2) -> list:
-    chars = "abcdefghijklmnopqrstuvwxyz0123456789_"
+async def generate_and_find_free(prefix: str = "", suffix: str = "", length: int = 5, count: int = 3) -> list:
+    chars_letters = "abcdefghijklmnopqrstuvwxyz"
+    chars_all = "abcdefghijklmnopqrstuvwxyz0123456789_"
     free_found = []
     attempts = 0
-    while len(free_found) < count and attempts < 35:
+    
+    # Збільшуємо кількість спроб до 100, щоб точно знайти вільні варіанти
+    while len(free_found) < count and attempts < 100:
         attempts += 1
         needed_len = max(2, length - len(prefix) - len(suffix))
-        random_part = "".join(random.choice(chars) for _ in range(needed_len))
+        
+        # Для довжини 5-9 додаємо цифри чи підкреслення, бо чисті букви зайняті
+        if needed_len >= 4:
+            rand_letters = "".join(random.choice(chars_letters) for _ in range(max(1, needed_len - 2)))
+            rand_tail = random.choice(["_1", "_99", "x", "77", "_tg", "01", "_pro", "s"])
+            random_part = (rand_letters + rand_tail)[:needed_len]
+        else:
+            random_part = "".join(random.choice(chars_all) for _ in range(needed_len))
+            
         candidate = f"{prefix}{random_part}{suffix}".lower()
         if not candidate[0].isalpha():
             candidate = "a" + candidate[1:]
+            
         if candidate in global_checked_usernames:
             continue
         global_checked_usernames.add(candidate)
+        
         if await check_single_username(candidate) is True:
             free_found.append(f"@{candidate}")
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.02)
+        
     return free_found
 
 @dp.message(Command("start"))
