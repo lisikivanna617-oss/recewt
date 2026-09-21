@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 
 # Створення бота та диспетчера
-BOT_TOKEN = "8985383934:AAG9ONTy8DIwmgSy3uvi-fbaSdKVYmSpVjY"
+BOT_TOKEN = "8985383934:AAFaZSgFxHBC1kJ1hGBsupEMHiMHpHilYhY"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
