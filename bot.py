@@ -23,7 +23,6 @@ logging.basicConfig(
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 if not BOT_TOKEN:
     logging.error("BOT_TOKEN is missing!")
 
@@ -64,149 +63,186 @@ def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
     if lang == "ua":
         return InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔍 Авто-пошук", callback_data="menu:auto"),
-                InlineKeyboardButton(text="🔤 Префікс / Суфікс", callback_data="menu:prefix"),
+                InlineKeyboardButton(text="⚡ Авто-пошук", callback_data="menu:auto"),
+                InlineKeyboardButton(text="⚙️ Префікс / Суфікс", callback_data="menu:prefix"),
             ],
             [
-                InlineKeyboardButton(text="🧠 Розумні варіації", callback_data="menu:smart"),
-                InlineKeyboardButton(text="👤 Профіль та Збережені", callback_data="menu:profile"),
+                InlineKeyboardButton(text="💡 Розумні варіації", callback_data="menu:smart"),
+                InlineKeyboardButton(text="📁 Профіль та Збережені", callback_data="menu:profile"),
             ],
             [
-                InlineKeyboardButton(text="🌍 Мова", callback_data="menu:settings"),
+                InlineKeyboardButton(text="🌐 Мова", callback_data="menu:settings"),
                 InlineKeyboardButton(text="ℹ️ Довідка", callback_data="menu:help"),
             ]
         ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔍 Auto-Search", callback_data="menu:auto"),
-                InlineKeyboardButton(text="🔤 Prefix / Suffix", callback_data="menu:prefix"),
+                InlineKeyboardButton(text="⚡ Auto-Search", callback_data="menu:auto"),
+                InlineKeyboardButton(text="⚙️ Prefix / Suffix", callback_data="menu:prefix"),
             ],
             [
-                InlineKeyboardButton(text="🧠 Smart Variations", callback_data="menu:smart"),
-                InlineKeyboardButton(text="👤 Profile & Saved", callback_data="menu:profile"),
+                InlineKeyboardButton(text="💡 Smart Variations", callback_data="menu:smart"),
+                InlineKeyboardButton(text="📁 Profile & Saved", callback_data="menu:profile"),
             ],
             [
-                InlineKeyboardButton(text="🌍 Language", callback_data="menu:settings"),
+                InlineKeyboardButton(text="🌐 Language", callback_data="menu:settings"),
                 InlineKeyboardButton(text="ℹ️ Help", callback_data="menu:help"),
             ]
         ])
 
 def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
     profile = get_user_profile(user_id)
-    text = "« Назад" if profile.get("lang") == "ua" else "« Back"
+    text = "‹ Назад" if profile.get("lang") == "ua" else "‹ Back"
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=text, callback_data="menu:main")]])
 
 def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons = []
     row = []
-    for length in range(5, 13):
-        row.append(InlineKeyboardButton(text=str(length), callback_data=f"len:{length}"))
-        if len(row) == 4:
+    for length in range(5, 12):
+        row.append(InlineKeyboardButton(text=f"[{length}]", callback_data=f"len:{length}"))
+        if len(row) == 3:
             buttons.append(row)
             row = []
     if row:
         buttons.append(row)
     profile = get_user_profile(user_id)
-    back_text = "« Назад" if profile.get("lang") == "ua" else "« Back"
+    back_text = "‹ Назад" if profile.get("lang") == "ua" else "‹ Back"
     buttons.append([InlineKeyboardButton(text=back_text, callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-async def check_single_username(username: str) -> bool | None:
+async def check_single_username(session: aiohttp.ClientSession, username: str) -> bool | None:
     username = username.lstrip("@").strip()
     if not USERNAME_PATTERN.match(username):
         return None
     url = f"https://t.me/{username}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
     }
-    timeout = aiohttp.ClientTimeout(total=5)
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status != 200:
-                    return None
-                text = await resp.text()
-                
-                if "tgme_action_button_new" in text or "If you have Telegram" in text or "View in Telegram" in text:
-                    return False
-                
-                if "tgme_page_extra" in text or "tgme_page_title" in text:
-                    if "is available on Telegram" in text or "you can set up" in text:
-                        return True
-                    return False
-
-                if "is available on Telegram" in text or "you can set up" in text or "username is not taken" in text:
-                    return True
-                    
-                if "tgme_page" in text and "tgme_page_photo" not in text and "tgme_page_additional" not in text:
-                    return True
-                    
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                return None
+            text = await resp.text()
+            
+            if "tgme_action_button_new" in text or "If you have Telegram" in text or "View in Telegram" in text:
                 return False
+            
+            if "tgme_page_extra" in text or "tgme_page_title" in text:
+                if "is available on Telegram" in text or "you can set up" in text:
+                    return True
+                return False
+
+            if "is available on Telegram" in text or "you can set up" in text or "username is not taken" in text:
+                return True
+                
+            if "tgme_page" in text and "tgme_page_photo" not in text and "tgme_page_additional" not in text:
+                return True
+                
+            return False
     except Exception:
         return None
 
-async def generate_and_find_free(message_to_edit, lang: str, prefix: str = "", suffix: str = "", length: int = 5, count: int = 3) -> list:
+async def generate_and_find_free(message_to_edit, lang: str, prefix: str = "", suffix: str = "", length: int = 5, count: int = 1) -> list:
     chars_letters = "abcdefghijklmnopqrstuvwxyz"
     free_found = []
     attempts = 0
-    max_attempts = 1000
+    max_attempts = 150  # Обмежуємо для надшвидкого пошуку (до 30-40 секунд)
     
     if lang == "ua":
         steps = [
-            ("🔍 Починаємо пошук... 10%", 10),
-            ("⚙️ Генеруємо комбінації... 30%", 30),
-            ("🌐 Перевіряємо бази Telegram... 50%", 50),
-            ("🔎 Відсіюємо зайняті юзи... 70%", 70),
-            ("🔥 Майже знайшли найкращі... 90%", 90),
+            ("┌ [ ⋯ ] ініціалізація пошуку... 25%", 25),
+            ("├ [ ≡ ] сканування баз даних... 50%", 50),
+            ("├ [ ⟳ ] перевірка статусів... 75%", 75),
+            ("└ [ ✓ ] завершення... 95%", 95),
         ]
     else:
         steps = [
-            ("🔍 Starting search... 10%", 10),
-            ("⚙️ Generating combinations... 30%", 30),
-            ("🌐 Scanning Telegram databases... 50%", 50),
-            ("🔎 Filtering taken tags... 70%", 70),
-            ("🔥 Almost found the best ones... 90%", 90),
+            ("┌ [ ⋯ ] initializing search... 25%", 25),
+            ("├ [ ≡ ] scanning databases... 50%", 50),
+            ("├ [ ⟳ ] checking statuses... 75%", 75),
+            ("└ [ ✓ ] finalizing... 95%", 95),
         ]
 
     step_index = 0
+    timeout = aiohttp.ClientTimeout(total=1.5)
     
-    while len(free_found) < count and attempts < max_attempts:
-        attempts += 1
-        
-        if attempts % 80 == 0 and step_index < len(steps):
-            try:
-                text, _ = steps[step_index]
-                await message_to_edit.edit_text(text, parse_mode="HTML")
-                step_index += 1
-            except Exception:
-                pass
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        while len(free_found) < count and attempts < max_attempts:
+            attempts += 1
+            
+            if attempts % 35 == 0 and step_index < len(steps):
+                try:
+                    text, _ = steps[step_index]
+                    await message_to_edit.edit_text(text, parse_mode="HTML")
+                    step_index += 1
+                except Exception:
+                    pass
 
-        needed_len = max(2, length - len(prefix) - len(suffix))
-        
-        if needed_len >= 4:
-            rand_letters = "".join(random.choice(chars_letters) for _ in range(max(1, needed_len - 2)))
-            rand_tail = random.choice(["_1", "_99", "x", "77", "_tg", "01", "_pro", "s", "io", "hq"])
-            random_part = (rand_letters + rand_tail)[:needed_len]
-        else:
-            chars_all = "abcdefghijklmnopqrstuvwxyz0123456789_"
-            random_part = "".join(random.choice(chars_all) for _ in range(needed_len))
+            needed_len = max(2, length - len(prefix) - len(suffix))
             
-        candidate = f"{prefix}{random_part}{suffix}".lower()
-        if not candidate[0].isalpha():
-            candidate = "a" + candidate[1:]
+            if needed_len >= 4:
+                rand_letters = "".join(random.choice(chars_letters) for _ in range(max(1, needed_len - 2)))
+                rand_tail = random.choice(["_1", "_99", "x", "77", "_tg", "01", "_pro", "s", "io"])
+                random_part = (rand_letters + rand_tail)[:needed_len]
+            else:
+                chars_all = "abcdefghijklmnopqrstuvwxyz0123456789_"
+                random_part = "".join(random.choice(chars_all) for _ in range(needed_len))
+                
+            candidate = f"{prefix}{random_part}{suffix}".lower()
+            if not candidate[0].isalpha():
+                candidate = "a" + candidate[1:]
+                
+            if candidate in global_checked_usernames:
+                continue
+            global_checked_usernames.add(candidate)
             
-        if candidate in global_checked_usernames:
-            continue
-        global_checked_usernames.add(candidate)
-        
-        if await check_single_username(candidate) is True:
-            free_found.append(f"@{candidate}")
-            
-        await asyncio.sleep(0.01)
-        
+            is_free = await check_single_username(session, candidate)
+            if is_free is True:
+                free_found.append(f"@{candidate}")
+                
     return free_found
+
+def format_result_card(username: str, lang: str) -> str:
+    clean = username.lstrip("@")
+    length = len(clean)
+    
+    readability = max(3, min(10, 11 - length))
+    if "_" in clean or any(c.isdigit() for c in clean):
+        readability = max(3, readability - 2)
+        
+    if length <= 5:
+        price = "$25 - $60"
+    elif length == 6:
+        price = "$10 - $25"
+    else:
+        price = "$3 - $10"
+        
+    liquidity = max(3, min(9, readability - 1))
+    
+    if lang == "ua":
+        return (
+            f"┌─[ status: found ]\n"
+            f"│\n"
+            f"├ target: <code>{username}</code>\n"
+            f"├ читабельність: {readability}/10\n"
+            f"├ прибл. ціна: {price}\n"
+            f"├ ліквідність: {liquidity}/10\n"
+            f"└ стан: [ вільний ]\n\n"
+            f"◇ @thetagtrackbot"
+        )
+    else:
+        return (
+            f"┌─[ status: found ]\n"
+            f"│\n"
+            f"├ target: <code>{username}</code>\n"
+            f"├ readability: {readability}/10\n"
+            f"├ approximate price: {price}\n"
+            f"├ liquidity: {liquidity}/10\n"
+            f"└ status: [ free ]\n\n"
+            f"◇ @thetagtrackbot"
+        )
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
@@ -216,9 +252,9 @@ async def cmd_start(message: Message, state: FSMContext):
     name = html.escape(message.from_user.first_name)
     
     if profile["lang"] == "ua":
-        text = f"👋 <b>Ласкаво просимо до Tag Track, {name}!</b>\n\nОберіть дію в меню нижче:"
+        text = f"┌─[ tag track system ]\n│\n├ вітаю, {name}!\n└ оберіть дію нижче:"
     else:
-        text = f"👋 <b>Welcome to Tag Track, {name}!</b>\n\nChoose an action below:"
+        text = f"┌─[ tag track system ]\n│\n├ welcome, {name}!\n└ choose an action below:"
         
     await message.answer(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
 
@@ -232,22 +268,22 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     
     if action == "main":
         name = html.escape(callback.from_user.first_name)
-        text = f"👋 <b>Welcome to Tag Track, {name}!</b>" if lang == "en" else f"👋 <b>Ласкаво просимо до Tag Track, {name}!</b>"
+        text = f"┌─[ tag track system ]\n│\n├ welcome, {name}!\n└ choose an action below:" if lang == "en" else f"┌─[ tag track system ]\n│\n├ вітаю, {name}!\n└ оберіть дію нижче:"
         await callback.message.edit_text(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         
     elif action == "auto":
         await state.set_state(BotStates.auto_search)
-        text = "🔍 Select length (5-12):" if lang == "en" else "🔍 Оберіть довжину (5-12):"
+        text = "┌─[ auto-search ]\n└ оберіть довжину (5-11):" if lang == "ua" else "┌─[ auto-search ]\n└ select length (5-11):"
         await callback.message.edit_text(text, reply_markup=length_keyboard(user_id), parse_mode="HTML")
         
     elif action == "prefix":
         await state.set_state(BotStates.prefix_search)
-        text = "🔤 Send prefix or suffix:" if lang == "en" else "🔤 Введіть префікс або суфікс:"
+        text = "┌─[ prefix / suffix ]\n└ введіть текст:" if lang == "ua" else "┌─[ prefix / suffix ]\n└ enter text:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     elif action == "smart":
         await state.set_state(BotStates.smart_variations)
-        text = "🧠 Send base name:" if lang == "en" else "🧠 Введіть базове ім'я:"
+        text = "┌─[ smart variations ]\n└ введіть базове ім'я:" if lang == "ua" else "┌─[ smart variations ]\n└ enter base name:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     elif action == "profile":
@@ -256,70 +292,68 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         
         if lang == "ua":
             text = (
-                f"👤 <b>Профіль користувача Tag Track</b>\n"
-                f"─────────────────────\n"
-                f"🆔 <b>Ваш Telegram ID:</b> <code>{user_id}</code>\n"
-                f"🌍 <b>Мова:</b> Українська\n"
-                f"📊 <b>Перевірок:</b> {profile['checks_count']}\n"
-                f"⭐ <b>Збережених:</b> {saved_count}\n"
-                f"📜 <b>Історія:</b> {history_count}"
+                f"┌─[ профіль користувача ]\n"
+                f"│\n"
+                f"├ id: <code>{user_id}</code>\n"
+                f"├ перевірок: {profile['checks_count']}\n"
+                f"├ збережено: {saved_count}\n"
+                f"└ історія: {history_count}"
             )
             markup = InlineKeyboardMarkup(inline_keyboard=[
                 [
-                    InlineKeyboardButton(text="⭐ Збережені", callback_data="menu:view_saved"),
-                    InlineKeyboardButton(text="📜 Історія", callback_data="menu:view_history")
+                    InlineKeyboardButton(text="[ збережені ]", callback_data="menu:view_saved"),
+                    InlineKeyboardButton(text="[ історія ]", callback_data="menu:view_history")
                 ],
-                [InlineKeyboardButton(text="« Назад", callback_data="menu:main")]
+                [InlineKeyboardButton(text="‹ назад", callback_data="menu:main")]
             ])
         else:
             text = (
-                f"👤 <b>Tag Track User Profile</b>\n"
-                f"─────────────────────\n"
-                f"🆔 <b>Your Telegram ID:</b> <code>{user_id}</code>\n"
-                f"🌍 <b>Language:</b> English\n"
-                f"📊 <b>Checks:</b> {profile['checks_count']}\n"
-                f"⭐ <b>Saved:</b> {saved_count}\n"
-                f"📜 <b>History:</b> {history_count}"
+                f"┌─[ user profile ]\n"
+                f"│\n"
+                f"├ id: <code>{user_id}</code>\n"
+                f"├ checks: {profile['checks_count']}\n"
+                f"├ saved: {saved_count}\n"
+                f"└ history: {history_count}"
             )
             markup = InlineKeyboardMarkup(inline_keyboard=[
                 [
-                    InlineKeyboardButton(text="⭐ Saved", callback_data="menu:view_saved"),
-                    InlineKeyboardButton(text="📜 History", callback_data="menu:view_history")
+                    InlineKeyboardButton(text="[ saved ]", callback_data="menu:view_saved"),
+                    InlineKeyboardButton(text="[ history ]", callback_data="menu:view_history")
                 ],
-                [InlineKeyboardButton(text="« Back", callback_data="menu:main")]
+                [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
             ])
         await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
-            text = "⭐ No saved usernames yet." if lang == "en" else "⭐ Збережених юзернеймів немає."
+            text = "┌─[ saved ]\n└ порожньо." if lang == "ua" else "┌─[ saved ]\n└ empty."
         else:
-            items = [f"⭐ <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Link</a>" for u in saved]
-            text = "⭐ <b>Saved Usernames:</b>\n\n" + "\n".join(items)
-        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML", disable_web_page_preview=True)
+            items = [f"├ <code>{u}</code>" for u in saved]
+            text = "┌─[ saved tags ]\n│\n" + "\n".join(items) + "\n└ —"
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     elif action == "view_history":
         history = profile["history"]
         if not history:
-            text = "📜 History is empty." if lang == "en" else "📜 Історія порожня."
+            text = "┌─[ history ]\n└ порожньо." if lang == "ua" else "┌─[ history ]\n└ empty."
         else:
-            items = [f"📜 <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Link</a>" for u in history]
-            text = "📜 <b>Recent Searches:</b>\n\n" + "\n".join(items)
-        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML", disable_web_page_preview=True)
+            items = [f"├ <code>{u}</code>" for u in history[:10]]
+            text = "┌─[ recent history ]\n│\n" + "\n".join(items) + "\n└ —"
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     elif action == "settings":
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🇬🇧 English", callback_data="setlang:en"),
-                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="setlang:ua"),
+                InlineKeyboardButton(text="[ en ]", callback_data="setlang:en"),
+                InlineKeyboardButton(text="[ ua ]", callback_data="setlang:ua"),
             ],
-            [InlineKeyboardButton(text="« Back", callback_data="menu:main")]
+            [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
         ])
-        await callback.message.edit_text("⚙️ Choose language / Оберіть мову:", reply_markup=markup, parse_mode="HTML")
+        await callback.message.edit_text("┌─[ language ]\n└ оберіть мову / select language:", reply_markup=markup, parse_mode="HTML")
         
     elif action == "help":
-        text = "ℹ️ <b>Help:</b>\nUse Auto-Search, Prefix Search, or Smart Variations to find available Telegram usernames."
+        text = "┌─[ help ]\n└ використовуйте авто-пошук або префікси для пошуку вільних тегів." if lang == "ua" else "┌─[ help ]\n└ use auto-search or prefixes to find available tags."
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     await callback.answer()
@@ -330,10 +364,9 @@ async def set_lang_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     get_user_profile(user_id)["lang"] = lang
     
-    name = html.escape(callback.from_user.first_name)
-    text = f"👋 <b>Welcome to Tag Track, {name}!</b>" if lang == "en" else f"👋 <b>Ласкаво просимо до Tag Track, {name}!</b>"
+    text = "┌─[ language ]\n└ збережено!" if lang == "ua" else "┌─[ language ]\n└ saved!"
     await callback.message.edit_text(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
-    await callback.answer("Saved / Збережено")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
@@ -342,31 +375,29 @@ async def length_selected_callback(callback: CallbackQuery):
     profile = get_user_profile(user_id)
     lang = profile.get("lang", "en")
     
-    msg = await callback.message.edit_text("🔍 10%...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, lang=lang, length=length, count=3)
+    msg = await callback.message.edit_text("┌ [ ⋯ ] ініціалізація...", parse_mode="HTML")
+    results = await generate_and_find_free(message_to_edit=msg, lang=lang, length=length, count=1)
     
     profile["checks_count"] += len(results)
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "❌ No free usernames found after 1000 checks." if lang == "en" else "❌ Після 1000 перевірок вільних юзернеймів не знайдено."
+        err_text = "┌─[ error ]\n└ вільних тегів не знайдено." if lang == "ua" else "┌─[ error ]\n└ no free tags found."
         await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         return
 
-    formatted = [f"🔹 <code>{u}</code>" for u in results]
-    buttons = []
-    for u in results:
-        clean_u = u.lstrip('@')
-        buttons.append([
-            InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="⭐ Save" if lang=="en" else "⭐ Зберегти", callback_data=f"save:{clean_u}")
-        ])
+    username = results[0]
+    clean_u = username.lstrip('@')
+    text = format_result_card(username, lang)
     
-    back_txt = "« Back" if lang == "en" else "« Назад"
-    buttons.append([InlineKeyboardButton(text=back_txt, callback_data="menu:main")])
-
-    res_title = "🎉 <b>Found Available Usernames:</b>\n\n" if lang == "en" else "🎉 <b>Знайдено вільні юзернейми:</b>\n\n"
-    text = res_title + "\n".join(formatted)
+    buttons = [
+        [
+            InlineKeyboardButton(text="[ ↗ відкрити ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ зберегти ]", callback_data=f"save:{clean_u}")
+        ],
+        [InlineKeyboardButton(text="‹ назад", callback_data="menu:main")]
+    ]
+    
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
 @dp.callback_query(F.data.startswith("save:"))
@@ -379,10 +410,10 @@ async def save_username_callback(callback: CallbackQuery):
     
     if uname not in profile["saved"]:
         profile["saved"].append(uname)
-        msg_text = f"✅ Saved {uname}!" if lang == "en" else f"✅ Збережено {uname}!"
+        msg_text = f"збережено: {uname}" if lang == "ua" else f"saved: {uname}"
         await callback.answer(msg_text, show_alert=True)
     else:
-        msg_text = "Already saved!" if lang == "en" else "Вже збережено!"
+        msg_text = "вже в збережених" if lang == "ua" else "already saved"
         await callback.answer(msg_text, show_alert=True)
 
 @dp.message(BotStates.prefix_search)
@@ -394,30 +425,28 @@ async def process_prefix_search(message: Message, state: FSMContext):
     profile = get_user_profile(user_id)
     lang = profile.get("lang", "en")
     
-    msg = await message.answer("🔍 10%...", parse_mode="HTML")
-    results = await generate_and_find_free(message_to_edit=msg, lang=lang, prefix=prefix, length=len(prefix) + 3, count=3)
+    msg = await message.answer("┌ [ ⋯ ] ініціалізація...", parse_mode="HTML")
+    results = await generate_and_find_free(message_to_edit=msg, lang=lang, prefix=prefix, length=len(prefix) + 3, count=1)
     
     profile["checks_count"] += len(results)
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "❌ No free usernames found after 1000 checks." if lang == "en" else "❌ Після 1000 перевірок вільних юзернеймів не знайдено."
+        err_text = "┌─[ error ]\n└ нічого не знайдено." if lang == "ua" else "┌─[ error ]\n└ nothing found."
         await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         return
         
-    formatted = [f"🔹 <code>{u}</code>" for u in results]
-    res_title = "🎉 <b>Found Available Usernames:</b>\n\n" if lang == "en" else "🎉 <b>Знайдено вільні юзернейми:</b>\n\n"
-    text = res_title + "\n".join(formatted)
+    username = results[0]
+    clean_u = username.lstrip('@')
+    text = format_result_card(username, lang)
     
-    buttons = []
-    for u in results:
-        clean_u = u.lstrip('@')
-        buttons.append([
-            InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="⭐ Save" if lang=="en" else "⭐ Зберегти", callback_data=f"save:{clean_u}")
-        ])
-    back_txt = "« Back" if lang == "en" else "« Назад"
-    buttons.append([InlineKeyboardButton(text=back_txt, callback_data="menu:main")])
+    buttons = [
+        [
+            InlineKeyboardButton(text="[ ↗ відкрити ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ зберегти ]", callback_data=f"save:{clean_u}")
+        ],
+        [InlineKeyboardButton(text="‹ назад", callback_data="menu:main")]
+    ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
@@ -430,35 +459,36 @@ async def process_smart_variations(message: Message, state: FSMContext):
     profile = get_user_profile(user_id)
     lang = profile.get("lang", "en")
     
-    msg = await message.answer("🔍 10%...", parse_mode="HTML")
+    msg = await message.answer("┌ [ ⋯ ] аналіз варіацій...", parse_mode="HTML")
     variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
     
     free_found = []
-    for var in variations:
-        if await check_single_username(var):
-            free_found.append(f"@{var}")
-            
+    timeout = aiohttp.ClientTimeout(total=1.5)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for var in variations:
+            if await check_single_username(session, var):
+                free_found.append(f"@{var}")
+                break
+                
     profile["checks_count"] += len(free_found)
     add_to_history(user_id, free_found)
             
     if not free_found:
-        err_text = "❌ No free variations found." if lang == "en" else "❌ Вільних варіацій не знайдено."
+        err_text = "┌─[ error ]\n└ вільних варіацій немає." if lang == "ua" else "┌─[ error ]\n└ no free variations."
         await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         return
         
-    formatted = [f"🔹 <code>{u}</code>" for u in free_found]
-    res_title = "🧠 <b>Found Variations:</b>\n\n" if lang == "en" else "🧠 <b>Знайдені варіації:</b>\n\n"
-    text = res_title + "\n".join(formatted)
+    username = free_found[0]
+    clean_u = username.lstrip('@')
+    text = format_result_card(username, lang)
     
-    buttons = []
-    for u in free_found:
-        clean_u = u.lstrip('@')
-        buttons.append([
-            InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="⭐ Save" if lang=="en" else "⭐ Зберегти", callback_data=f"save:{clean_u}")
-        ])
-    back_txt = "« Back" if lang == "en" else "« Назад"
-    buttons.append([InlineKeyboardButton(text=back_txt, callback_data="menu:main")])
+    buttons = [
+        [
+            InlineKeyboardButton(text="[ ↗ відкрити ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ зберегти ]", callback_data=f"save:{clean_u}")
+        ],
+        [InlineKeyboardButton(text="‹ назад", callback_data="menu:main")]
+    ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
@@ -468,4 +498,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-            
