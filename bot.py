@@ -34,7 +34,6 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
-ADMIN_ID = 5619415334
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
 # Збереження даних у пам'яті
@@ -44,7 +43,7 @@ global_checked_usernames = set()
 
 TEXTS = {
     "en": {
-        "welcome": "👋 <b>Welcome to Tag Track, {name}!</b>\n═════════════════════\nAutomated Telegram Username Finder & Generator.\n\n👇 <i>Choose an action below:</i>",
+        "welcome": "👋 <b>Welcome to USERNAME FIX, {name}!</b>\n═════════════════════\nAutomated Telegram Username Finder & Generator.\n\n👇 <i>Choose an action below:</i>",
         "btn_auto_search": "🔍 Auto-Search",
         "btn_prefix_search": "🔤 Prefix / Suffix",
         "btn_smart_variations": "🧠 Smart Variations",
@@ -53,18 +52,21 @@ TEXTS = {
         "btn_help": "ℹ️ Help",
         "btn_back": "« Back to Menu",
         "btn_export_txt": "📦 Export TXT",
-        "btn_view_saved": "⭐ View Saved Usernames",
+        "btn_view_saved": "⭐ Saved Usernames",
+        "btn_view_history": "📜 Search History",
         "search_prompt": "🔍 <b>Auto-Search Usernames</b>\nSelect desired username length (5 to 12 chars):",
         "smart_prompt": "🧠 <b>Smart Variations</b>\nSend a base name (e.g., <code>falbercht</code>):",
         "prefix_prompt": "🔤 <b>Prefix Search</b>\nSend prefix or suffix (e.g., <code>app</code> or <code>bot</code>):",
         "searching": "🔍 Scanning Telegram network... Please wait ⏳",
         "search_results": "🎉 <b>Found Available Usernames</b>\n🆔 <b>Search ID:</b> <code>#{search_id}</code>\n─────────────────────\n{results}",
         "search_none": "❌ No free usernames found. Try again!",
-        "profile_text": "👤 <b>User Profile</b>\n─────────────────────\n🆔 <b>User ID:</b> <code>{user_id}</code>\n🌍 <b>Language:</b> {lang}\n📊 <b>Checks Performed:</b> {checks}\n⭐ <b>Saved Usernames:</b> {saved_count}",
+        "profile_text": "👤 <b>User Profile</b>\n─────────────────────\n🆔 <b>User ID:</b> <code>{user_id}</code>\n🌍 <b>Language:</b> {lang}\n📊 <b>Checks Performed:</b> {checks}\n⭐ <b>Saved Usernames:</b> {saved_count}\n📜 <b>History Records:</b> {history_count}",
         "saved_title": "⭐ <b>Your Saved Usernames:</b>\n─────────────────────\n{list}",
         "saved_empty": "⭐ No saved usernames yet.",
+        "history_title": "📜 <b>Your Recent Search History:</b>\n─────────────────────\n{list}",
+        "history_empty": "📜 Search history is empty.",
         "saved_success": "✅ Username {username} saved!",
-        "help_text": "ℹ️ <b>Help & Features</b>\n═════════════════════\n• <b>Auto-Search:</b> Scan random free usernames.\n• <b>Prefix/Suffix:</b> Search with specific text.\n• <b>Smart Variations:</b> Generate name variations.",
+        "help_text": "ℹ️ <b>Help & Features</b>\n═════════════════════\n• <b>Auto-Search:</b> Scan random free usernames.\n• <b>Prefix/Suffix:</b> Search with specific text.\n• <b>Smart Variations:</b> Generate name variations.\n• <b>Profile & Saved:</b> Track your ID, saved names and history.",
         "lang_changed": "Language updated! ✅",
     },
     "ua": {
@@ -77,18 +79,21 @@ TEXTS = {
         "btn_help": "ℹ️ Довідка",
         "btn_back": "« Назад у меню",
         "btn_export_txt": "📦 Експорт TXT",
-        "btn_view_saved": "⭐ Переглянути збережені",
+        "btn_view_saved": "⭐ Збережені юзернейми",
+        "btn_view_history": "📜 Історія пошуку",
         "search_prompt": "🔍 <b>Авто-пошук юзернеймів</b>\nОберіть бажану довжину (від 5 до 12 символів):",
         "smart_prompt": "🧠 <b>Розумні варіації</b>\nВведіть базове ім'я (наприклад, <code>falbercht</code>):",
         "prefix_prompt": "🔤 <b>Пошук за словом</b>\nВведіть префікс або суфікс (наприклад, <code>app</code>):",
         "searching": "🔍 Скануємо мережу Telegram... Зачекайте ⏳",
         "search_results": "🎉 <b>Знайдені вільні юзернейми</b>\n🆔 <b>Search ID:</b> <code>#{search_id}</code>\n─────────────────────\n{results}",
         "search_none": "❌ Вільних юзернеймів не знайдено. Спробуйте ще раз!",
-        "profile_text": "👤 <b>Профіль користувача</b>\n─────────────────────\n🆔 <b>User ID:</b> <code>{user_id}</code>\n🌍 <b>Мова:</b> {lang}\n📊 <b>Усього перевірок:</b> {checks}\n⭐ <b>Збережених:</b> {saved_count}",
+        "profile_text": "👤 <b>Профіль користувача</b>\n─────────────────────\n🆔 <b>ID користувача:</b> <code>{user_id}</code>\n🌍 <b>Мова:</b> {lang}\n📊 <b>Усього перевірок:</b> {checks}\n⭐ <b>Збережених:</b> {saved_count}\n📜 <b>Записів в історії:</b> {history_count}",
         "saved_title": "⭐ <b>Ваші збережені юзернейми:</b>\n─────────────────────\n{list}",
         "saved_empty": "⭐ Збережених юзернеймів немає.",
+        "history_title": "📜 <b>Остання історія пошуку:</b>\n─────────────────────\n{list}",
+        "history_empty": "📜 Історія пошуку порожня.",
         "saved_success": "✅ Юзернейм {username} збережено!",
-        "help_text": "ℹ️ <b>Довідка та функції</b>\n═════════════════════\n• <b>Авто-пошук:</b> Пошук випадкових вільних юзерів.\n• <b>Префікс/Суфікс:</b> Пошук за початком/закінченням.\n• <b>Розумні варіації:</b> Генерація назв із приставками.",
+        "help_text": "ℹ️ <b>Довідка та функції</b>\n═════════════════════\n• <b>Авто-пошук:</b> Пошук випадкових вільних юзерів.\n• <b>Префікс/Суфікс:</b> Пошук за початком/закінченням.\n• <b>Розумні варіації:</b> Генерація назв із приставками.\n• <b>Профіль:</b> Ваш ID, збережені юзернейми та історія.",
         "lang_changed": "Мову успішно змінено! ✅",
     }
 }
@@ -96,11 +101,25 @@ TEXTS = {
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",  # Мова за замовчуванням — англійська
+            "lang": "en",
             "saved": [],
+            "history": [],
             "checks_count": 0,
         }
-    return user_data_store[user_id]
+    profile = user_data_store[user_id]
+    if "saved" not in profile:
+        profile["saved"] = []
+    if "history" not in profile:
+        profile["history"] = []
+    return profile
+
+def add_to_history(user_id: int, usernames: list):
+    profile = get_user_profile(user_id)
+    for u in usernames:
+        if u not in profile["history"]:
+            profile["history"].insert(0, u)
+    # Зберігаємо тільки останні 20 записів
+    profile["history"] = profile["history"][:20]
 
 def t(user_id: int, key: str, **kwargs) -> str:
     profile = get_user_profile(user_id)
@@ -108,7 +127,11 @@ def t(user_id: int, key: str, **kwargs) -> str:
     if lang not in TEXTS:
         lang = "en"
     template = TEXTS[lang].get(key, TEXTS["en"].get(key, ""))
-    return template.format(**kwargs)
+    try:
+        return template.format(**kwargs)
+    except Exception as e:
+        logging.error(f"Error formatting key '{key}': {e}")
+        return template
 
 class BotStates(StatesGroup):
     auto_search = State()
@@ -260,16 +283,21 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     elif action == "profile":
         profile = get_user_profile(user_id)
         saved_list = profile.get("saved", [])
+        history_list = profile.get("history", [])
         text = t(
             user_id, "profile_text",
             user_id=user_id,
             lang=profile.get("lang", "en").upper(),
             checks=profile.get("checks_count", 0),
-            saved_count=len(saved_list)
+            saved_count=len(saved_list),
+            history_count=len(history_list)
         )
         markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text=t(user_id, "btn_view_saved"), callback_data="menu:view_saved")],
+                [
+                    InlineKeyboardButton(text=t(user_id, "btn_view_saved"), callback_data="menu:view_saved"),
+                    InlineKeyboardButton(text=t(user_id, "btn_view_history"), callback_data="menu:view_history")
+                ],
                 [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
             ]
         )
@@ -280,8 +308,17 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         if not saved:
             text = t(user_id, "saved_empty")
         else:
-            items = [f"⭐ <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Link</a>" for u in saved]
+            items = [f"⭐ <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Open</a>" for u in saved]
             text = t(user_id, "saved_title", list="\n".join(items))
+        await safe_edit_text(callback, text, reply_markup=back_keyboard(user_id))
+    elif action == "view_history":
+        profile = get_user_profile(user_id)
+        history = profile.get("history", [])
+        if not history:
+            text = t(user_id, "history_empty")
+        else:
+            items = [f"📜 <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Open</a>" for u in history]
+            text = t(user_id, "history_title", list="\n".join(items))
         await safe_edit_text(callback, text, reply_markup=back_keyboard(user_id))
     elif action == "settings":
         await safe_edit_text(callback, "⚙️ <b>Choose language / Оберіть мову:</b>", reply_markup=settings_keyboard(user_id))
@@ -314,6 +351,7 @@ async def length_selected_callback(callback: CallbackQuery):
     
     profile = get_user_profile(user_id)
     profile["checks_count"] = profile.get("checks_count", 0) + len(results)
+    add_to_history(user_id, results)
     
     if not results:
         await safe_edit_text(callback, t(user_id, "search_none"), reply_markup=main_keyboard(user_id))
@@ -340,9 +378,6 @@ async def save_username_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     profile = get_user_profile(user_id)
-    if "saved" not in profile:
-        profile["saved"] = []
-        
     if uname not in profile["saved"]:
         profile["saved"].append(uname)
         await callback.answer(t(user_id, "saved_success", username=uname), show_alert=True)
@@ -376,6 +411,7 @@ async def process_prefix_search(message: Message, state: FSMContext):
     
     profile = get_user_profile(user_id)
     profile["checks_count"] = profile.get("checks_count", 0) + len(results)
+    add_to_history(user_id, results)
     
     if not results:
         await msg.edit_text(t(user_id, "search_none"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
@@ -409,31 +445,4 @@ async def process_smart_variations(message: Message, state: FSMContext):
         if await check_single_username(var):
             free_found.append(f"@{var}")
             
-    profile = get_user_profile(user_id)
-    profile["checks_count"] = profile.get("checks_count", 0) + len(free_found)
-            
-    if not free_found:
-        await msg.edit_text(t(user_id, "search_none"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
-        return
-        
-    formatted = [f"🔹 <code>{u}</code>" for u in free_found]
-    text = f"🧠 <b>Found Variations:</b>\n─────────────────────\n" + "\n".join(formatted)
-    
-    buttons = []
-    for u in free_found:
-        clean_u = u.lstrip('@')
-        buttons.append([
-            InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="⭐ Save", callback_data=f"save:{clean_u}")
-        ])
-    buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
-    
-    await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
-
-async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-    
+ 
