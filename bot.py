@@ -245,7 +245,7 @@ TEXTS = {
 async def is_subscribed(user_id: int) -> bool:
     """Перевірка підписки на обов'язковий канал."""
     try:
-        member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        member = await bot.get_chat_member(chat_id=@usernameFix, user_id=user_id)
         return member.status in ["creator", "administrator", "member"]
     except Exception as e:
         logging.warning(f"Не вдалося перевірити підписку для {user_id}: {e}")
