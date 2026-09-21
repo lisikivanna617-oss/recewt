@@ -162,23 +162,53 @@ async def check_single_username(username: str) -> bool | None:
     except Exception:
         return None
 
-async def generate_and_find_free(prefix: str = "", suffix: str = "", length: int = 5, count: int = 3) -> list:
+async def generate_and_find_free(message_to_edit, lang: str, prefix: str = "", suffix: str = "", length: int = 5, count: int = 3) -> list:
     chars_letters = "abcdefghijklmnopqrstuvwxyz"
-    chars_all = "abcdefghijklmnopqrstuvwxyz0123456789_"
     free_found = []
     attempts = 0
+    max_attempts = 1000  # Збільшено до 1000 перевірок!
     
-    # Збільшуємо кількість спроб до 100, щоб точно знайти вільні варіанти
-    while len(free_found) < count and attempts < 100:
+    # Тексти для анімації прогресу
+    if lang == "ua":
+        steps = [
+            ("🔍 Починаємо пошук... 10%", 10),
+            ("⚙️ Генеруємо комбінації... 30%", 30),
+            ("🌐 Перевіряємо бази Telegram... 50%", 50),
+            ("🔎 Відсіюємо зайняті юзернейми... 70%", 70),
+            ("🔥 Майже знайшли найкращі... 90%", 90),
+        ]
+    else:
+        steps = [
+            ("🔍 Starting search... 10%", 10),
+            ("⚙️ Generating combinations... 30%", 30),
+            ("🌐 Scanning Telegram databases... 50%", 50),
+            ("🔎 Filtering taken tags... 70%", 70),
+            ("🔥 Almost found the best ones... 90%", 90),
+        ]
+
+    step_index = 0
+    
+    while len(free_found) < count and attempts < max_attempts:
         attempts += 1
+        
+        # Оновлюємо статус кожні 80 спроб, щоб створювати ефект живого пошуку
+        if attempts % 80 == 0 and step_index < len(steps):
+            try:
+                text, _ = steps[step_index]
+                await message_to_edit.edit_text(text, parse_mode="HTML")
+                step_index += 1
+            except Exception:
+                pass
+
         needed_len = max(2, length - len(prefix) - len(suffix))
         
-        # Для довжини 5-9 додаємо цифри чи підкреслення, бо чисті букви зайняті
+        # Генерація комбінацій для коротких і середніх юзернеймів з корисними суфіксами
         if needed_len >= 4:
             rand_letters = "".join(random.choice(chars_letters) for _ in range(max(1, needed_len - 2)))
-            rand_tail = random.choice(["_1", "_99", "x", "77", "_tg", "01", "_pro", "s"])
+            rand_tail = random.choice(["_1", "_99", "x", "77", "_tg", "01", "_pro", "s", "io", "hq"])
             random_part = (rand_letters + rand_tail)[:needed_len]
         else:
+            chars_all = "abcdefghijklmnopqrstuvwxyz0123456789_"
             random_part = "".join(random.choice(chars_all) for _ in range(needed_len))
             
         candidate = f"{prefix}{random_part}{suffix}".lower()
@@ -191,10 +221,12 @@ async def generate_and_find_free(prefix: str = "", suffix: str = "", length: int
         
         if await check_single_username(candidate) is True:
             free_found.append(f"@{candidate}")
-        await asyncio.sleep(0.02)
+            
+        # Мінімальна пауза для плавності асинхронності
+        await asyncio.sleep(0.01)
         
     return free_found
-
+    
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
