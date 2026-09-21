@@ -26,7 +26,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-# Отримання токена зі змінних оточення Railway (Variables)
+# Отримання токена зі змінних оточення Railway
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
@@ -35,14 +35,10 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
-# Налаштування каналу для обов'язкової підписки
-CHANNEL_USERNAME = "@usernamingFix"
-CHANNEL_URL = "https://t.me/usernamingFix"
-
 ADMIN_ID = 5619415334
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
-# Збереження даних користувачів та кєш
+# Збереження даних користувачів та кеш
 user_data_store = {}
 search_results_cache = {}
 global_checked_usernames = set()
@@ -91,9 +87,6 @@ TEXTS = {
         "saved_success": "✅ Username <b>{username}</b> saved!",
         "help_text": "ℹ️ <b>Help & Features</b>\n═════════════════════\n• <b>Auto-Search:</b> Scan random free usernames.\n• <b>Prefix/Suffix:</b> Search usernames with specific start or end.\n• <b>Exact Check:</b> Direct single username verification.\n• <b>Smart Variations:</b> Generate prefixes, suffixes, and tags.\n• <b>Categories:</b> Topic-specific generators (Gaming, F1, Tech, etc.).\n• <b>Export TXT:</b> Download results as a text file.",
         "lang_changed": "Language successfully changed! ✅",
-        "sub_required": "🚀 <b>Subscription Required!</b>\nPlease subscribe to our official channel to use the bot:\n{channel}",
-        "btn_sub": "📢 Subscribe to Channel",
-        "btn_check_sub": "✅ Verify Subscription",
         "admin_demo_start": "🧪 <b>Admin Demo Mode Triggered</b>\nRunning batch scan of 20 test usernames...",
     },
     "ua": {
@@ -114,7 +107,7 @@ TEXTS = {
         "search_prompt": "🔍 <b>Авто-пошук юзернеймів</b>\n─────────────────────\nОберіть бажану довжину (від 5 до 12 символів):",
         "type_prompt": "⚙️ <b>Фільтр символів</b>\n─────────────────────\nОберіть склад юзернейму:",
         "btn_letters": "Лише букви 🔤",
-        "btn_numbers": "Букви + Цифри 🔢",
+        "btn_numbers": "Букви + Циفري 🔢",
         "prefix_prompt": "🔤 <b>Пошук за префіксом</b>\n─────────────────────\nВведіть початок (наприклад, <code>app</code> для пошуку <code>@app...</code>):",
         "suffix_prompt": "🔚 <b>Пошук за закінченням</b>\n─────────────────────\nВведіть закінчення (наприклад, <code>dev</code> для пошуку <code>@...dev</code>):",
         "exact_prompt": "🎯 <b>Точний пошук</b>\n─────────────────────\nВведіть конкретний юзернейм для перевірки (наприклад, <code>@username</code>):",
@@ -139,9 +132,6 @@ TEXTS = {
         "saved_success": "✅ Юзернейм <b>{username}</b> збережено!",
         "help_text": "ℹ️ <b>Довідка та функції</b>\n═════════════════════\n• <b>Авто-пошук:</b> Пошук випадкових вільних юзерів.\n• <b>Префікс/Суфікс:</b> Пошук за початком або закінченням.\n• <b>Точна перевірка:</b> Пряма перевірка юзернейму.\n• <b>Розумні варіації:</b> Генерація з приставками та тегами.\n• <b>Категорії:</b> Генерація під обрану тематику.\n• <b>Експорт TXT:</b> Завантаження списку результатів у файл.",
         "lang_changed": "Мову успішно змінено! ✅",
-        "sub_required": "🚀 <b>Обов'язкова підписка!</b>\nДля використання бота підпишіться на наш офіційний канал:\n{channel}",
-        "btn_sub": "📢 Підписатися на канал",
-        "btn_check_sub": "✅ Перевірити підписку",
         "admin_demo_start": "🧪 <b>Запущено тестовий режим адміна</b>\nСканування пачки з 20 юзернеймів...",
     },
     "de": {
@@ -187,9 +177,6 @@ TEXTS = {
         "saved_success": "✅ <b>{username}</b> gespeichert!",
         "help_text": "ℹ️ <b>Hilfe</b>\nAutomatische Suche und Überwachung von Telegram-Benutzernamen.",
         "lang_changed": "Sprache geändert! ✅",
-        "sub_required": "🚀 <b>Abonnement erforderlich!</b>\nKanal abonnieren: {channel}",
-        "btn_sub": "📢 Kanal Abonnieren",
-        "btn_check_sub": "✅ Überprüfen",
         "admin_demo_start": "🧪 Admin-Testmodus gestartet...",
     },
     "zh": {
@@ -235,34 +222,18 @@ TEXTS = {
         "saved_success": "✅ <b>{username}</b> 保存成功！",
         "help_text": "ℹ️ <b>帮助</b>\n自动检测与生成 Telegram 可用用户名。",
         "lang_changed": "语言更改成功！ ✅",
-        "sub_required": "🚀 <b>必须关注频道！</b>\n请先关注官方频道：{channel}",
-        "btn_sub": "📢 关注频道",
-        "btn_check_sub": "✅ 检查关注",
         "admin_demo_start": "🧪 管理员测试模式已启动...",
     }
 }
 
 async def is_subscribed(user_id: int) -> bool:
-    """Перевірка підписки на обов'язковий канал."""
-    try:
-        member = await bot.get_chat_member(chat_id="@usernameFix", user_id=user_id)
-        return member.status in ["creator", "administrator", "member"]
-    except Exception as e:
-        logging.warning(f"Не вдалося перевірити підписку для {user_id}: {e}")
-        return True
-
-def sub_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=t(user_id, "btn_sub"), url=CHANNEL_URL)],
-            [InlineKeyboardButton(text=t(user_id, "btn_check_sub"), callback_data="check_sub")]
-        ]
-    )
+    """Перевірка підписки вимкнена — доступ відкрито для всіх."""
+    return True
 
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "lang": "en",  # За замовчуванням встановили англійську мову
+            "lang": "en",
             "saved": [],
             "history": [],
             "monitored": [],
@@ -382,4 +353,474 @@ async def safe_edit_text(callback: CallbackQuery, text: str, reply_markup=None):
             logging.warning(f"TelegramBadRequest: {e}")
     except Exception as e:
         logging.error(f"Error editing message: {e}")
+
+async def check_single_username(username: str) -> bool | None:
+    """Перевірка статусу юзернейму через Web Endpoint t.me."""
+    username = username.lstrip("@").strip()
+    if not USERNAME_PATTERN.match(username):
+        return None
+    url = f"https://t.me/{username}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=5) as resp:
+                text = await resp.text()
+                if "tgme_page_extra" in text or "tgme_page_title" in text:
+                    if "If you have Telegram, you can contact" in text or "View in Telegram" in text or "tgme_user" in text or "tgme_channel" in text:
+                        return False
+                if "If you have Telegram, you can set up" in text or "is available on Telegram" in text:
+                    return True
+                if resp.status == 200 and "tgme_page" in text and "tgme_page_photo" not in text:
+                    return True
+    def get_user_profile(user_id: int):
+    if user_id not in user_data_store:
+        user_data_store[user_id] = {
+            "lang": "en",
+            "saved": [],
+            "history": [],
+            "monitored": [],
+            "checks_count": 0,
+            "temp_length": 5,
+            "temp_use_numbers": True,
+        }
+    return user_data_store[user_id]
+
+def t(user_id: int, key: str, **kwargs) -> str:
+    profile = get_user_profile(user_id)
+    lang = profile.get("lang", "en")
+    if lang not in TEXTS:
+        lang = "en"
+    template = TEXTS[lang].get(key, TEXTS["en"].get(key, ""))
+    return template.format(**kwargs)
+
+class BotStates(StatesGroup):
+    auto_search = State()
+    prefix_search = State()
+    suffix_search = State()
+    exact_search = State()
+    smart_variations = State()
+    monitor_username = State()
+    waiting_feedback = State()
+
+def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=t(user_id, "btn_auto_search"), callback_data="menu:auto"),
+                InlineKeyboardButton(text=t(user_id, "btn_exact_search"), callback_data="menu:exact"),
+            ],
+            [
+                InlineKeyboardButton(text=t(user_id, "btn_prefix_search"), callback_data="menu:prefix"),
+                InlineKeyboardButton(text=t(user_id, "btn_suffix_search"), callback_data="menu:suffix"),
+            ],
+            [
+                InlineKeyboardButton(text=t(user_id, "btn_smart_variations"), callback_data="menu:smart"),
+                InlineKeyboardButton(text=t(user_id, "btn_categories"), callback_data="menu:categories"),
+            ],
+            [
+                InlineKeyboardButton(text=t(user_id, "btn_profile"), callback_data="menu:profile"),
+                InlineKeyboardButton(text=t(user_id, "btn_mon"), callback_data="menu:monitor"),
+            ],
+            [
+                InlineKeyboardButton(text=t(user_id, "btn_settings"), callback_data="menu:settings"),
+                InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="menu:help"),
+            ]
+        ]
+    )
+
+def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")]]
+    )
+
+def categories_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t(user_id, "cat_gaming"), callback_data="cat:gaming")],
+            [InlineKeyboardButton(text=t(user_id, "cat_f1"), callback_data="cat:f1")],
+            [InlineKeyboardButton(text=t(user_id, "cat_tech"), callback_data="cat:tech")],
+            [InlineKeyboardButton(text=t(user_id, "cat_brand"), callback_data="cat:brand")],
+            [InlineKeyboardButton(text=t(user_id, "cat_personal"), callback_data="cat:personal")],
+            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+        ]
+    )
+
+def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    buttons = []
+    row = []
+    for length in range(5, 13):
+        row.append(InlineKeyboardButton(text=str(length), callback_data=f"len:{length}"))
+        if len(row) == 4:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def type_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t(user_id, "btn_letters"), callback_data="type:letters")],
+            [InlineKeyboardButton(text=t(user_id, "btn_numbers"), callback_data="type:numbers")],
+            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+        ]
+    )
+
+def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🇬🇧 English", callback_data="setlang:en"),
+                InlineKeyboardButton(text="🇺🇦 Українська", callback_data="setlang:ua"),
+            ],
+            [
+                InlineKeyboardButton(text="🇩🇪 Deutsch", callback_data="setlang:de"),
+                InlineKeyboardButton(text="🇨🇳 中文", callback_data="setlang:zh"),
+            ],
+            [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+        ]
+    )
+
+async def safe_edit_text(callback: CallbackQuery, text: str, reply_markup=None):
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+            disable_web_page_preview=True
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            logging.warning(f"TelegramBadRequest: {e}")
+    except Exception as e:
+        logging.error(f"Error editing message: {e}")
+
+async def check_single_username(username: str) -> bool | None:
+    """Перевірка статусу юзернейму через Web Endpoint t.me."""
+    username = username.lstrip("@").strip()
+    if not USERNAME_PATTERN.match(username):
+        return None
+    url = f"https://t.me/{username}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=5) as resp:
+                text = await resp.text()
+                if "tgme_page_extra" in text or "tgme_page_title" in text:
+                    if "If you have Telegram, you can contact" in text or "View in Telegram" in text or "tgme_user" in text or "tgme_channel" in text:
+                        return False
+                if "If you have Telegram, you can set up" in text or "is available on Telegram" in text:
+                    return True
+                if resp.status == 200 and "tgme_page" in text and "tgme_page_photo" not in text:
+                    return True
+                return False
+    except Exception:
+        return None
+
+def analyze_username(username: str, lang: str = "en"):
+    clean = username.lstrip("@")
+    has_nums = bool(re.search(r"\d", clean))
+    
+    if lang == "ua":
+        nums_str = "З цифрами 🔢" if has_nums else "Лише букви 🔤"
+        letter_type = "Голосна" if clean[0].lower() in "aeiou" else "Приголосна"
+    else:
+        nums_str = "With numbers 🔢" if has_nums else "Letters only 🔤"
+        letter_type = "Vowel" if clean[0].lower() in "aeiou" else "Consonant"
+    
+    length = len(clean)
+    if length == 5 and not has_nums:
+        rating = "5/5 ⭐⭐⭐⭐⭐"
+        price = "100 - 300 TON ($250 - $700)"
+    elif length == 6 and not has_nums:
+        rating = "4.5/5 ⭐⭐⭐⭐✨"
+        price = "30 - 90 TON ($70 - $200)"
+    elif not has_nums:
+        rating = "4/5 ⭐⭐⭐⭐"
+        price = "10 - 30 TON ($25 - $70)"
+    else:
+        rating = "3/5 ⭐⭐⭐"
+        price = "1 - 8 TON ($3 - $20)"
         
+    return nums_str, letter_type, rating, price
+
+async def generate_and_find_free(prefix: str = "", suffix: str = "", length: int = 5, use_numbers: bool = True, count: int = 2) -> list:
+    chars = "abcdefghijklmnopqrstuvwxyz0123456789_" if use_numbers else "abcdefghijklmnopqrstuvwxyz_"
+    free_found = []
+    attempts = 0
+    
+    while len(free_found) < count and attempts < 40:
+        attempts += 1
+        needed_len = length - len(prefix) - len(suffix)
+        if needed_len < 0:
+            needed_len = 2
+            
+        random_part = "".join(random.choice(chars) for _ in range(needed_len))
+        candidate = f"{prefix}{random_part}{suffix}".lower()
+        
+        if not candidate[0].isalpha():
+            candidate = "a" + candidate[1:]
+            
+        if candidate in global_checked_usernames:
+            continue
+            
+        global_checked_usernames.add(candidate)
+        is_free = await check_single_username(candidate)
+        if is_free is True:
+            free_found.append(f"@{candidate}")
+        await asyncio.sleep(0.05)
+    return free_found
+
+def create_txt_export(results: list, search_id: str) -> BufferedInputFile:
+    content = f"=== USERNAME FIX RESULTS (ID: #{search_id}) ===\n\n"
+    for uname in results:
+        content += f"Username: {uname}\n"
+        content += f"Link: https://t.me/{uname.lstrip('@')}\n"
+        content += "-" * 35 + "\n"
+    return BufferedInputFile(content.encode("utf-8"), filename=f"usernames_{search_id}.txt")
+
+@dp.message(Command("start", "старт"))
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
+    user_id = message.from_user.id
+    name = html.escape(message.from_user.first_name)
+    text = t(user_id, "welcome", name=name)
+    await message.answer(text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+
+@dp.message(Command("admin_demo"))
+async def cmd_admin_demo(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer(t(message.from_user.id, "admin_demo_start"), parse_mode="HTML")
+    results = await generate_and_find_free(length=6, count=5)
+    formatted = "\n".join([f"• <code>{u}</code> ✅ Available" for u in results])
+    await message.answer(f"🧪 <b>Demo Results:</b>\n\n{formatted}", parse_mode="HTML")
+
+@dp.callback_query(F.data.startswith("menu:"))
+async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.clear()
+    action = callback.data.split(":")[1]
+    
+    if action == "main":
+        name = html.escape(callback.from_user.first_name)
+        text = t(user_id, "welcome", name=name)
+        await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
+    elif action == "auto":
+        await state.set_state(BotStates.auto_search)
+        await safe_edit_text(callback, t(user_id, "search_prompt"), reply_markup=length_keyboard(user_id))
+    elif action == "prefix":
+        await state.set_state(BotStates.prefix_search)
+        await safe_edit_text(callback, t(user_id, "prefix_prompt"), reply_markup=back_keyboard(user_id))
+    elif action == "suffix":
+        await state.set_state(BotStates.suffix_search)
+        await safe_edit_text(callback, t(user_id, "suffix_prompt"), reply_markup=back_keyboard(user_id))
+    elif action == "exact":
+        await state.set_state(BotStates.exact_search)
+        await safe_edit_text(callback, t(user_id, "exact_prompt"), reply_markup=back_keyboard(user_id))
+    elif action == "smart":
+        await state.set_state(BotStates.smart_variations)
+        await safe_edit_text(callback, t(user_id, "smart_prompt"), reply_markup=back_keyboard(user_id))
+    elif action == "categories":
+        await safe_edit_text(callback, t(user_id, "categories_prompt"), reply_markup=categories_keyboard(user_id))
+    elif action == "profile":
+        profile = get_user_profile(user_id)
+        text = t(
+            user_id, "profile_text",
+            user_id=user_id,
+            lang=profile.get("lang", "en").upper(),
+            checks=profile.get("checks_count", 0),
+            saved_count=len(profile.get("saved", [])),
+            mon_count=len(profile.get("monitored", []))
+        )
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=t(user_id, "saved_title", list="").split(":")[0], callback_data="menu:view_saved")],
+                [InlineKeyboardButton(text=t(user_id, "btn_clear_history"), callback_data="menu:clear_hist")],
+                [InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")],
+            ]
+        )
+        await safe_edit_text(callback, text, reply_markup=markup)
+    elif action == "view_saved":
+        profile = get_user_profile(user_id)
+        saved = profile.get("saved", [])
+        if not saved:
+            text = t(user_id, "saved_empty")
+        else:
+            items = [f"⭐ <code>{u}</code> — <a href='https://t.me/{u.lstrip('@')}'>Open</a>" for u in saved]
+            text = t(user_id, "saved_title", list="\n".join(items))
+        await safe_edit_text(callback, text, reply_markup=back_keyboard(user_id))
+    elif action == "clear_hist":
+        profile = get_user_profile(user_id)
+        profile["history"] = []
+        await callback.answer(t(user_id, "history_cleared"))
+        await safe_edit_text(callback, t(user_id, "history_empty"), reply_markup=back_keyboard(user_id))
+    elif action == "monitor":
+        await state.set_state(BotStates.monitor_username)
+        await safe_edit_text(callback, t(user_id, "mon_prompt"), reply_markup=back_keyboard(user_id))
+    elif action == "settings":
+        await safe_edit_text(callback, "⚙️ <b>Select Language / Оберіть мову:</b>", reply_markup=settings_keyboard(user_id))
+    elif action == "help":
+        await safe_edit_text(callback, t(user_id, "help_text"), reply_markup=back_keyboard(user_id))
+        
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("setlang:"))
+async def set_lang_callback(callback: CallbackQuery):
+    lang = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    get_user_profile(user_id)["lang"] = lang
+    
+    name = html.escape(callback.from_user.first_name)
+    text = t(user_id, "welcome", name=name)
+    await safe_edit_text(callback, text, reply_markup=main_keyboard(user_id))
+    await callback.answer(t(user_id, "lang_changed"))
+
+@dp.callback_query(F.data.startswith("cat:"))
+async def category_selected_callback(callback: CallbackQuery):
+    cat = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    
+    suffixes = {
+        "gaming": ["_gg", "play", "_game", "_esports"],
+        "f1": ["_f1", "_gp", "racing", "_speed"],
+        "tech": ["_dev", "_tech", "code", "_io"],
+        "brand": ["_hq", "official", "_inc", "_co"],
+        "personal": ["_me", "real", "_life", "_official"]
+    }
+    
+    suf = random.choice(suffixes.get(cat, ["_app"]))
+    await safe_edit_text(callback, t(user_id, "searching"))
+    
+    results = await generate_and_find_free(suffix=suf, length=7, count=2)
+    await display_results(callback, user_id, results)
+
+@dp.callback_query(F.data.startswith("len:"))
+async def length_selected_callback(callback: CallbackQuery):
+    length = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    get_user_profile(user_id)["temp_length"] = length
+    await safe_edit_text(callback, t(user_id, "type_prompt"), reply_markup=type_keyboard(user_id))
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("type:"))
+async def type_selected_callback(callback: CallbackQuery):
+    choice = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    profile = get_user_profile(user_id)
+    
+    profile["temp_use_numbers"] = (choice == "numbers")
+    length = profile.get("temp_length", 5)
+    
+    await safe_edit_text(callback, t(user_id, "searching"))
+    results = await generate_and_find_free(length=length, use_numbers=profile["temp_use_numbers"], count=2)
+    await display_results(callback, user_id, results)
+
+async def display_results(callback: CallbackQuery, user_id: int, results: list):
+    lang = get_user_profile(user_id).get("lang", "en")
+    search_id = str(uuid.uuid4())[:6].upper()
+    search_results_cache[search_id] = results
+    
+    profile = get_user_profile(user_id)
+    profile["checks_count"] = profile.get("checks_count", 0) + len(results)
+    
+    if not results:
+        text = t(user_id, "search_none")
+        markup = main_keyboard(user_id)
+    else:
+        formatted = []
+        buttons = []
+        for uname in results:
+            nums, l_type, rating, price = analyze_username(uname, lang)
+            formatted.append(
+                f"🔹 <code>{uname}</code>\n"
+                f"   • Type: {nums} | {l_type}\n"
+                f"   • Rating: {rating}\n"
+                f"   • Est. Price: <b>{price}</b>"
+            )
+            buttons.append([
+                InlineKeyboardButton(text=f"🔗 {uname}", url=f"https://t.me/{uname.lstrip('@')}"),
+                InlineKeyboardButton(text=f"⭐ Save", callback_data=f"save:{uname}")
+            ])
+            
+        text = t(user_id, "search_results", search_id=search_id, results="\n\n".join(formatted))
+        buttons.append([InlineKeyboardButton(text=t(user_id, "btn_export_txt"), callback_data=f"export:{search_id}")])
+        buttons.append([InlineKeyboardButton(text=t(user_id, "btn_more"), callback_data="menu:auto")])
+        buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    await safe_edit_text(callback, text, reply_markup=markup)
+
+@dp.callback_query(F.data.startswith("save:"))
+async def save_username_callback(callback: CallbackQuery):
+    uname = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    saved = get_user_profile(user_id)["saved"]
+    
+    if uname not in saved:
+        saved.append(uname)
+        await callback.answer(t(user_id, "saved_success", username=uname))
+    else:
+        await callback.answer("Already saved!")
+
+@dp.callback_query(F.data.startswith("export:"))
+async def export_txt_callback(callback: CallbackQuery):
+    search_id = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    results = search_results_cache.get(search_id, [])
+    
+    if not results:
+        await callback.answer("Results expired!")
+        return
+        
+    doc = create_txt_export(results, search_id)
+    await callback.message.answer_document(doc, caption=f"📦 Exported results for Search #{search_id}")
+    await callback.answer()
+
+@dp.message(BotStates.prefix_search)
+async def process_prefix_search(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    prefix = message.text.strip().lstrip("@")
+    await state.clear()
+    
+    msg = await message.answer(t(user_id, "searching"), parse_mode="HTML")
+    results = await generate_and_find_free(prefix=prefix, length=len(prefix) + 3, count=2)
+    
+    search_id = str(uuid.uuid4())[:6].upper()
+    search_results_cache[search_id] = results
+    
+    if not results:
+        await msg.edit_text(t(user_id, "search_none"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        return
+        
+    formatted = [f"🔹 <code>{u}</code>\n   • Est. Price: <b>1-10 TON</b>" for u in results]
+    text = t(user_id, "search_results", search_id=search_id, results="\n\n".join(formatted))
+    
+    buttons = [[InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{u.lstrip('@')}") ] for u in results]
+    buttons.append([InlineKeyboardButton(text=t(user_id, "btn_export_txt"), callback_data=f"export:{search_id}")])
+    buttons.append([InlineKeyboardButton(text=t(user_id, "btn_back"), callback_data="menu:main")])
+    
+    await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
+
+@dp.message(BotStates.suffix_search)
+async def process_suffix_search(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    suffix = message.text.strip().lstrip("@")
+    await state.clear()
+    
+    msg = await message.answer(t(user_id, "searching"), parse_mode="HTML")
+    results = await generate_and_find_free(suffix=suffix, length=len(suffix) + 3, count=2)
+    
+    search_id = str(uuid.uuid4())[:6].upper()
+    search_results_cache[search_id] = results
+    
+    if not results:
+        await msg.edit_text(t(user_id, "search_none"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        return
+        
+    formatted = [f"🔹 <code>{u}</code>\n   • Est. Price: <b>1-10 TON</b>" for u in results]
+    text = t(user_id, "search_results", search_id=search_id, results="\n\n".join(formatted))
+    
+    buttons = [[InlineKeyboardButton(text=f"🔗 {u}", url=f"https://t.me/{u.lstrip('@')}")] for u in results]
+    buttons.append([InlineKeyboar
