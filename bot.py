@@ -369,4 +369,4 @@ def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
         ]
     )
 
-async def safe_edit_text(callback: Callback)
+async def safe_edit_text(callback: Callba
