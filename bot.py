@@ -369,4 +369,17 @@ def settings_keyboard(user_id: int) -> InlineKeyboardMarkup:
         ]
     )
 
-async def safe_edit_text(callback: Callba
+async def safe_edit_text(callback: CallbackQuery, text: str, reply_markup=None):
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+            disable_web_page_preview=True
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            logging.warning(f"TelegramBadRequest: {e}")
+    except Exception as e:
+        logging.error(f"Error editing message: {e}")
+        
