@@ -127,34 +127,31 @@ async def check_single_username(username: str) -> bool | None:
     if not USERNAME_PATTERN.match(username):
         return None
     url = f"https://t.me/{username}"
-    # Додаємо більш реалістичні заголовки, щоб Telegram не блокував запити
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
     }
+    
+    # Використовуємо загальну сесію через клієнт, щоб уникнути помилок unclosed session
+    timeout = aiohttp.ClientTimeout(total=5)
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=5) as resp:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers) as resp:
                 if resp.status != 200:
                     return None
                 text = await resp.text()
                 
-                # Якщо на сторінці є блок про завантаження додатку або кнопка "Send Message" / "View in Telegram" — профіль зайнятий
                 if "tgme_action_button_new" in text or "If you have Telegram" in text or "View in Telegram" in text:
                     return False
                 
-                # Якщо це канал/група і там є назва або публікації
                 if "tgme_page_extra" in text or "tgme_page_title" in text:
-                    # Але перевіримо, чи це часом не сторінка вільного юзернейму
                     if "is available on Telegram" in text or "you can set up" in text:
                         return True
                     return False
 
-                # Головний маркер вільного юзернейму в Telegram
                 if "is available on Telegram" in text or "you can set up" in text or "username is not taken" in text:
                     return True
                     
-                # Додаткова перевірка: якщо немає специфічних блоків зайнятого акаунта, але сторінка виглядає пустою
                 if "tgme_page" in text and "tgme_page_photo" not in text and "tgme_page_additional" not in text:
                     return True
                     
@@ -166,7 +163,7 @@ async def generate_and_find_free(message_to_edit, lang: str, prefix: str = "", s
     chars_letters = "abcdefghijklmnopqrstuvwxyz"
     free_found = []
     attempts = 0
-    max_attempts = 1000  # Збільшено до 1000 перевірок!
+    max_attempts = 10000  # Збільшено до 10000 перевірок!
     
     # Тексти для анімації прогресу
     if lang == "ua":
