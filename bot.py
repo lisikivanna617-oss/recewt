@@ -39,7 +39,7 @@ def get_user_profile(user_id: int):
             "saved": [],
             "history": [],
             "checks_count": 0,
-            "lang": "en",  # за замовчуванням англійська
+            "lang": "en",
         }
     return user_data_store[user_id]
 
@@ -50,7 +50,6 @@ def add_to_history(user_id: int, usernames: list):
             profile["history"].insert(0, u)
     profile["history"] = profile["history"][:20]
 
-# Словник локалізації з унікальними красивими символами для кожного розділу
 LANGS = {
     "en": {
         "welcome": "<b>Welcome, {name}</b>\n\nChoose the required section from the menu below:",
@@ -233,9 +232,9 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
 async def generate_and_find_free(message_to_edit, user_id: int, prefix: str = "", suffix: str = "", target_length: int = 6, use_digits: bool = True, digits_count: int = 1, count: int = 1) -> list:
     free_found = []
     attempts = 0
-    max_attempts = 100
+    max_attempts = 150  # Збільшено кількість спроб
     
-    timeout = aiohttp.ClientTimeout(total=2)
+    timeout = aiohttp.ClientTimeout(total=1)  # Зменшено таймаут до 1 секунди для швидкості
     
     letters = "abcdefghijklmnopqrstuvwxyz"
     digits = "0123456789"
@@ -282,8 +281,9 @@ async def generate_and_find_free(message_to_edit, user_id: int, prefix: str = ""
                 
             if await check_single_username(session, candidate):
                 free_found.append(f"@{candidate}")
+                break  # Зупиняємось одразу після знаходження першого вільного, щоб не морозити бота
                 
-            await asyncio.sleep(0.02)
+            # Прибрали затримку asyncio.sleep, щоб шукало на максимальній швидкості
             
     return free_found
 
@@ -426,8 +426,7 @@ async def digits_choice_callback(callback: CallbackQuery):
         add_to_history(user_id, results)
         
         if not results:
-            err_text = t(user_id, "err_not_found")
-            await msg.edit_text(err_text, reply_markup=main_keyboard)(user_id, "err_prefix")
+            err_text = t(user_id, "err_prefix")
         await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         return
         
@@ -463,7 +462,7 @@ async def process_smart_variations(message: Message, state: FSMContext):
             variations.append(v)
     
     free_found = []
-    timeout = aiohttp.ClientTimeout(total=2)
+    timeout = aiohttp.ClientTimeout(total=1)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         for var in variations:
             if USERNAME_PATTERN.match(var) and await check_single_username(session, var):
@@ -498,3 +497,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+          
