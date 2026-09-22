@@ -462,13 +462,15 @@ async def cmd_ban(message: Message):
     if len(args) < 3:
         await message.answer("Формат: `/ban user_id дні причина`", parse_mode="Markdown")
         return
-    try:
+        try:
         target_id = int(args[1])
         days = int(args[2])
         reason = args[3] if len(args) > 3 else "Порушення правил"
         ban_user(target_id, reason, days)
+        await message.answer(f"✅ Користувача `{target_id}` заблоковано.", parse_mode="Markdown")
+    except Exception as e:
         await message.answer(f"Помилка: {e}")
-
+        
 @dp.message(Command("unban"))
 async def cmd_unban(message: Message):
     if message.from_user.id != ADMIN_ID:
