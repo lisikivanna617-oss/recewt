@@ -17,7 +17,6 @@ from aiogram.types import (
     Message,
 )
 
-# Налаштування логування
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
@@ -25,26 +24,19 @@ logging.basicConfig(
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    logging.critical("BOT_TOKEN environment variable is missing! Bot cannot start.")
-    exit(1)
+    logging.error("BOT_TOKEN is missing!")
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
-USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
-
-DICTIONARY_WORDS = [
-    "blade", "cyber", "ghost", "shadow", "storm", "frost", "night", 
-    "blood", "alpha", "omega", "viper", "cortex", "matrix", "nexus",
-    "pixel", "orbit", "vector", "signal", "static", "phantom"
-]
+USERNAME_PATTERN = re.compile(f"^[A-Za-z][A-Za-z0-9_]{{4,31}}$")
 
 user_data_store = {}
 
 def get_user_profile(user_id: int):
     if user_id not in user_data_store:
         user_data_store[user_id] = {
-            "saved": {},       # {"@username": "нотатка"}
+            "saved": [],
             "history": [],
             "checks_count": 0,
             "lang": "en",
@@ -60,101 +52,73 @@ def add_to_history(user_id: int, usernames: list):
 
 LANGS = {
     "en": {
-        "welcome": (
-            "<b>Welcome, {name}</b>\n\n"
-            "🆔 ID: <code>{user_id}</code>\n"
-            "📊 Checks: {checks} | 💾 Saved: {saved_cnt}\n"
-            "🌐 Language: English\n\n"
-            "Choose an action below:"
-        ),
+        "welcome": "<b>Welcome, {name}</b>\n\nChoose an action below:",
         "btn_auto": "⚡ Auto Search",
-        "btn_dict": "📖 From Dictionary (Mutation)",
-        "btn_saved": "☆ Saved Tags & Notes",
+        "btn_saved": "☆ Saved Tags",
         "btn_history": "⏱ History",
+        "btn_profile": "👤 Profile",
         "btn_lang": "🌐 Change Language (EN/UA)",
         "btn_help": "✪ Help",
         "back": "⎋ Go Back",
         "main_menu": "⎋ Main Menu",
         "auto_title": "⚡ <b>Auto Search</b>\n\nChoose desired username length (5 to 11 characters):",
-        "dict_title": (
-            "📖 <b>Dictionary Mutation Search</b>\n\n"
-            "Enter a word (e.g. <code>blade</code>) or click the button below to pick a random dictionary word. "
-            "The bot will check mutated variants (like <code>blkde</code>):"
-        ),
-        "btn_random_word": "🎲 Pick Random Word",
-        "help_text": "✪ <b>Help & Instructions</b>\n\n1. Use Auto Search for random names.\n2. Use Dictionary Mutation to transform real words into unique free usernames.\n3. Save tags with personal notes directly!",
+        "help_text": "✪ <b>Help & Instructions</b>\n\n1. Use Auto Search to find random available usernames.\n2. Save your favorite tags.\n3. Check your history anytime!",
         "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: {length} characters.\nDo you want to include digits?",
         "digits_yes": "☑ With Digits",
         "digits_no": "☒ Letters Only",
         "dcount_prompt": "⚡ <b>Auto Search</b>\n\nLength: {length} characters.\nHow many digits to include?",
         "scan_nodig": "⌕ Scanning {length}-char username (no digits)...",
         "scan_dig": "⌕ Scanning username ({length} chars, {d_count} digits)...",
-        "scan_dict": "📖 Mutating and checking variants for «{word}»...",
-        "err_not_found": "⚠ <b>Error</b>\n\nNo free usernames found with these parameters.",
-        "err_dict": "⚠ <b>Error</b>\n\nCould not find available mutated variations for this word. Try another one.",
+        "err_not_found": "⚠ <b>Error</b>\n\nNo free usernames found with these parameters. Try again!",
         "res_title": "💎 <b>SEARCH RESULT</b>\n\n◌ Username: <code>{username}</code>\n◌ Length: {length} characters\n◌ Readability: {readability} / 10\n◌ Category: {category}\n◌ Status: Available for registration\n",
         "cat_prem": "Premium",
         "cat_std": "Standard",
         "cat_reg": "Regular",
         "btn_open": "↗ Open Link",
-        "btn_save": "☆ Save with Note",
+        "btn_save": "☆ Save",
         "btn_retry": "↻ Try Again",
-        "note_prompt": "📝 Enter a personal note/comment for <b>{uname}</b>:",
-        "saved_success": "Successfully saved {uname} with your note!",
+        "saved_success": "Successfully saved {uname}!",
         "saved_already": "This item is already in your saved list.",
         "saved_empty": "☆ <b>Saved Tags</b>\n\nYour saved list is empty.",
-        "saved_title": "☆ <b>Saved Tags & Notes</b>\n\n",
+        "saved_title": "☆ <b>Saved Tags</b>\n\n",
         "history_empty": "⏱ <b>Search History</b>\n\nYour history is empty.",
         "history_title": "⏱ <b>Search History</b>\n\n",
+        "profile_text": "👤 <b>User Profile</b>\n\n🆔 ID: <code>{user_id}</code>\n📊 Total checks: {checks}\n💾 Saved tags: {saved_cnt}\n🌐 Language: English",
         "lang_changed": "Language changed to English."
     },
     "uk": {
-        "welcome": (
-            "<b>Вітаю, {name}</b>\n\n"
-            "🆔 ID: <code>{user_id}</code>\n"
-            "📊 Перевірок: {checks} | 💾 Збережено: {saved_cnt}\n"
-            "🌐 Мова: Українська\n\n"
-            "Оберіть дію нижче:"
-        ),
+        "welcome": "<b>Вітаю, {name}</b>\n\nОберіть дію нижче:",
         "btn_auto": "⚡ Автоматичний пошук",
-        "btn_dict": "📖 Зі словника (Мутація)",
-        "btn_saved": "☆ Збережені і нотатки",
+        "btn_saved": "☆ Збережені теги",
         "btn_history": "⏱ Історія",
+        "btn_profile": "👤 Профіль",
         "btn_lang": "🌐 Змінити мову (EN/UA)",
         "btn_help": "✪ Довідка",
         "back": "⎋ Повернутися назад",
         "main_menu": "⎋ Головне меню",
         "auto_title": "⚡ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину імені (від 5 до 11 символів):",
-        "dict_title": (
-            "📖 <b>Мутація слів зі словника</b>\n\n"
-            "Введіть своє слово (наприклад, <code>blade</code>) або натисніть кнопку випадкового вибору. "
-            "Бот створить мутації шляхом зміни/видалення літер (на кшталт <code>blkde</code>) та перевірить їх:"
-        ),
-        "btn_random_word": "🎲 Випадкове слово",
-        "help_text": "✪ <b>Довідка та інструкція</b>\n\n1. Використовуйте автопошук для випадкових імен.\n2. Режим мутації перетворює реальні слова на унікальні вільні юзернейми.\n3. Зберігайте імена з власними нотатками!",
+        "help_text": "✪ <b>Довідка та інструкція</b>\n\n1. Використовуйте автопошук для пошуку вільних юзернеймів.\n2. Зберігайте улюблені варіанти.\n3. Переглядайте історію запитів!",
         "len_prompt": "⚡ <b>Автоматичний пошук</b>\n\nОбрана довжина: {length} символів.\nЧи використовувати цифри у назві?",
         "digits_yes": "☑ З цифрами",
         "digits_no": "☒ Тільки букви",
         "dcount_prompt": "⚡ <b>Автоматичний пошук</b>\n\nДовжина: {length} символів.\nСкільки цифр додати?",
         "scan_nodig": "⌕ Сканування імені з {length} символів (без цифр)...",
         "scan_dig": "⌕ Сканування імені ({length} символів, {d_count} цифр)...",
-        "scan_dict": "📖 Мутація та перевірка варіацій для «{word}»...",
-        "err_not_found": "⚠ <b>Помилка</b>\n\nВільних імен за вашими параметрами не знайдено.",
-        "err_dict": "⚠ <b>Помилка</b>\n\nНе вдалося знайти вільних мутацій для цього слова. Спробуйте інше.",
+        "err_not_found": "⚠ <b>Помилка</b>\n\nВільних імен за вашими параметрами не знайдено. Спробуйте ще!",
         "res_title": "💎 <b>РЕЗУЛЬТАТ ПОШУКУ</b>\n\n◌ Ім'я: <code>{username}</code>\n◌ Довжина: {length} символів\n◌ Читабельність: {readability} / 10\n◌ Категорія: {category}\n◌ Статус: Вільний для реєстрації\n",
         "cat_prem": "Преміум",
         "cat_std": "Стандартний",
         "cat_reg": "Звичайний",
         "btn_open": "↗ Відкрити посилання",
-        "btn_save": "☆ Зберегти з нотаткою",
+        "btn_save": "☆ Зберегти",
         "btn_retry": "↻ Повторити спробу",
-        "note_prompt": "📝 Введіть особисту нотатку/коментар для <b>{uname}</b>:",
-        "saved_success": "Успішно збережено {uname} разом із нотаткою!",
+        "saved_success": "Успішно збережено {uname}!",
         "saved_already": "Цей елемент вже є у вашому списку.",
-        "saved_empty": "☆ <b>Збережені імена</b>\n\nСписок збережених поки що порожній.",
-        "saved_title": "☆ <b>Збережені імена та нотатки</b>\n\n",
+        "saved_empty": "☆ <b>Збережені теги</b>\n\nСписок збережених поки що порожній.",
+        "saved_title": "☆ <b>Збережені теги</b>\n\n",
         "history_empty": "⏱ <b>Історія перевірок</b>\n\nІсторія запитів порожня.",
         "history_title": "⏱ <b>Історія перевірок</b>\n\n",
+        "profile_text": "👤 <b>Профіль користувача</b>\n\n🆔 ID: <code>{user_id}</code>\n📊 Всього перевірок: {checks}\n💾 Збережено тегів: {saved_cnt}\n🌐 Мова: Українська",
         "lang_changed": "Мову змінено на українську."
     }
 }
@@ -169,33 +133,23 @@ def t(user_id: int, key: str, **kwargs) -> str:
 
 class BotStates(StatesGroup):
     auto_search = State()
-    dict_search = State()
-    waiting_for_note = State()
 
 def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=t(user_id, "btn_auto"), callback_data="nav:auto"),
-            InlineKeyboardButton(text=t(user_id, "btn_dict"), callback_data="nav:dict"),
-        ],
+        [InlineKeyboardButton(text=t(user_id, "btn_auto"), callback_data="nav:auto")],
         [
             InlineKeyboardButton(text=t(user_id, "btn_saved"), callback_data="nav:view_saved"),
             InlineKeyboardButton(text=t(user_id, "btn_history"), callback_data="nav:view_history"),
         ],
         [
+            InlineKeyboardButton(text=t(user_id, "btn_profile"), callback_data="nav:profile"),
             InlineKeyboardButton(text=t(user_id, "btn_lang"), callback_data="nav:toggle_lang"),
-            InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help"),
-        ]
+        ],
+        [InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help")]
     ])
 
 def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=t(user_id, "back"), callback_data="nav:main")]])
-
-def dict_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t(user_id, "btn_random_word"), callback_data="dict:random")],
-        [InlineKeyboardButton(text=t(user_id, "back"), callback_data="nav:main")]
-    ])
 
 def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons = []
@@ -272,36 +226,13 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
     except Exception:
         return False
 
-def generate_mutations(word: str) -> set:
-    word = word.lower().strip()
-    mutations = set()
-    vowels_map = {'a': 'e', 'e': 'i', 'i': 'y', 'o': 'u', 'u': 'a'}
-    
-    for i in range(len(word)):
-        mutations.add(word[:i] + word[i+1:])
-        if word[i] in vowels_map:
-            mutations.add(word[:i] + vowels_map[word[i]] + word[i+1:])
-        mutations.add(word[:i] + word[i] + word[i] + word[i+1:])
-        mutations.add(word[:i] + "_" + word[i+1:])
-
-    for i in range(len(word) - 1):
-        mutations.add(word[:i] + word[i+1] + word[i] + word[i+2:])
-
-    suffixes = ["x", "cl", "hq", "io", "24"]
-    for sfx in suffixes:
-        mutations.add(f"{word}{sfx}")
-        mutations.add(f"{sfx}{word}")
-        mutations.add(f"{word}_{sfx}")
-
-    return {m for m in mutations if 5 <= len(m) <= 32 and USERNAME_PATTERN.match(m)}
-
 async def generate_and_find_free(user_id: int, target_length: int = 6, use_digits: bool = True, digits_count: int = 1) -> str:
     letters = "abcdefghijklmnopqrstuvwxyz"
     digits = "0123456789"
     timeout = aiohttp.ClientTimeout(total=1.5)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         candidates = set()
-        for _ in range(30):
+        for _ in range(35):
             first = random.choice(letters)
             if use_digits and digits_count > 0:
                 mid = "".join(random.choice(letters + "_") for _ in range(target_length - digits_count - 1))
@@ -317,15 +248,6 @@ async def generate_and_find_free(user_id: int, target_length: int = 6, use_digit
             if USERNAME_PATTERN.match(candidate):
                 if await check_single_username(session, candidate):
                     return f"@{candidate}"
-    return ""
-
-async def find_free_mutation(word: str) -> str:
-    candidates = generate_mutations(word)
-    timeout = aiohttp.ClientTimeout(total=1.5)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        for cand in candidates:
-            if await check_single_username(session, cand):
-                return f"@{cand}"
     return ""
 
 def format_result_card(user_id: int, username: str) -> str:
@@ -346,14 +268,7 @@ def format_result_card(user_id: int, username: str) -> str:
 
 async def send_main_menu(message_or_callback, user_id: int, edit: bool = True):
     name = html.escape(message_or_callback.from_user.first_name)
-    profile = get_user_profile(user_id)
-    text = t(
-        user_id, "welcome", 
-        name=name, 
-        user_id=user_id, 
-        checks=profile['checks_count'], 
-        saved_cnt=len(profile["saved"])
-    )
+    text = t(user_id, "welcome", name=name)
     markup = main_keyboard(user_id)
     if edit:
         await message_or_callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
@@ -379,24 +294,20 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await state.set_state(BotStates.auto_search)
         text = t(user_id, "auto_title")
         await callback.message.edit_text(text, reply_markup=length_keyboard(user_id), parse_mode="HTML")
-    elif action == "dict":
-        await state.set_state(BotStates.dict_search)
-        text = t(user_id, "dict_title")
-        await callback.message.edit_text(text, reply_markup=dict_menu_keyboard(user_id), parse_mode="HTML")
     elif action == "toggle_lang":
         profile["lang"] = "uk" if profile["lang"] == "en" else "en"
         await send_main_menu(callback, user_id, edit=True)
         await callback.answer(t(user_id, "lang_changed"), show_alert=True)
         return
+    elif action == "profile":
+        text = t(user_id, "profile_text", user_id=user_id, checks=profile["checks_count"], saved_cnt=len(profile["saved"]))
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
             text = t(user_id, "saved_empty")
         else:
-            items = []
-            for u, note in saved.items():
-                note_str = f" — <i>{html.escape(note)}</i>" if note else ""
-                items.append(f"• <code>{u}</code>{note_str}")
+            items = [f"• <code>{u}</code>" for u in saved]
             text = t(user_id, "saved_title") + "\n".join(items)
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
     elif action == "view_history":
@@ -412,29 +323,6 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
         
     await callback.answer()
-
-@dp.callback_query(F.data == "dict:random")
-async def dict_random_callback(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    word = random.choice(DICTIONARY_WORDS)
-    profile = get_user_profile(user_id)
-    
-    msg = await callback.message.edit_text(t(user_id, "scan_dict", word=word), parse_mode="HTML")
-    username = await find_free_mutation(word)
-    
-    profile["checks_count"] += 1
-    if username:
-        add_to_history(user_id, [username])
-        
-    if not username:
-        err_text = t(user_id, "err_dict")
-        await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
-        return
-
-    clean_u = username.lstrip('@')
-    text = format_result_card(user_id, username)
-    markup = get_result_keyboard(user_id, clean_u, retry_callback="nav:dict")
-    await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 @dp.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
@@ -456,7 +344,32 @@ async def digits_choice_callback(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=digits_count_keyboard(user_id, length), parse_mode="HTML")
     else:
         msg = await callback.message.edit_text(t(user_id, "scan_nodig", length=length), parse_mode="HTML")
-        username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=True, digits_count=d_count)
+        username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=False)
+        
+        profile["checks_count"] += 1
+        if username:
+            add_to_history(user_id, [username])
+        
+        if not username:
+            err_text = t(user_id, "err_not_found")
+            await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+            return
+
+        clean_u = username.lstrip('@')
+        text = format_result_card(user_id, username)
+        markup = get_result_keyboard(user_id, clean_u, retry_callback=f"len:{length}")
+        await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+
+@dp.callback_query(F.data.startswith("dcount:"))
+async def digits_count_callback(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    length = int(parts[1])
+    d_count = int(parts[2])
+    user_id = callback.from_user.id
+    profile = get_user_profile(user_id)
+    
+    msg = await callback.message.edit_text(t(user_id, "scan_dig", length=length, d_count=d_count), parse_mode="HTML")
+    username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=True, digits_count=d_count)
     
     profile["checks_count"] += 1
     if username:
@@ -473,7 +386,7 @@ async def digits_choice_callback(callback: CallbackQuery):
     await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 @dp.callback_query(F.data.startswith("save:"))
-async def save_username_callback(callback: CallbackQuery, state: FSMContext):
+async def save_username_callback(callback: CallbackQuery):
     raw_uname = callback.data.split(":", 1)[1]
     uname = f"@{raw_uname.lstrip('@')}"
     user_id = callback.from_user.id
@@ -483,55 +396,10 @@ async def save_username_callback(callback: CallbackQuery, state: FSMContext):
         await callback.answer(t(user_id, "saved_already"), show_alert=True)
         return
         
-    await state.set_state(BotStates.waiting_for_note)
-    await state.update_data(pending_save_uname=uname)
-    
-    await callback.message.answer(t(user_id, "note_prompt", uname=uname), parse_mode="HTML")
-    await callback.answer()
-
-@dp.message(BotStates.waiting_for_note)
-async def process_saved_note(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    data = await state.get_data()
-    uname = data.get("pending_save_uname")
-    note = message.text.strip()
-    
-    await state.clear()
-    profile = get_user_profile(user_id)
-    
-    if uname:
-        profile["saved"][uname] = note
-        await message.answer(t(user_id, "saved_success", uname=uname), parse_mode="HTML")
-        await send_main_menu(message, user_id, edit=False)
-    else:
-        await message.answer("Error saving item.")
-
-@dp.message(BotStates.dict_search)
-async def process_dict_search(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    word = message.text.strip().lstrip("@").lower()
-    await state.clear()
-    
-    profile = get_user_profile(user_id)
-    msg = await message.answer(t(user_id, "scan_dict", word=word), parse_mode="HTML")
-    username = await find_free_mutation(word)
-    
-    profile["checks_count"] += 1
-    if username:
-        add_to_history(user_id, [username])
-    
-    if not username:
-        err_text = t(user_id, "err_dict")
-        await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
-        return
-        
-    clean_u = username.lstrip('@')
-    text = format_result_card(user_id, username)
-    markup = get_result_keyboard(user_id, clean_u, retry_callback="nav:dict")
-    await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+    profile["saved"].append(uname)
+    await callback.answer(t(user_id, "saved_success", uname=uname), show_alert=True)
 
 async def main():
-    # Видаляємо старі вебхуки та залишки, щоб Polling працював без затримок
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("Bot is starting polling...")
     await dp.start_polling(bot)
