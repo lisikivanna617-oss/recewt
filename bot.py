@@ -50,90 +50,90 @@ def add_to_history(user_id: int, usernames: list):
             profile["history"].insert(0, u)
     profile["history"] = profile["history"][:20]
 
-# Словник локалізації
+# Словник локалізації з унікальними красивими символами для кожного розділу
 LANGS = {
     "en": {
         "welcome": "<b>Welcome, {name}</b>\n\nChoose the required section from the menu below:",
-        "btn_auto": "✦ Auto Search",
-        "btn_prefix": "✦ Prefix / Suffix",
-        "btn_smart": "✦ Smart Variations",
-        "btn_profile": "✦ Profile & Settings",
-        "btn_help": "▫ Help & Instructions",
+        "btn_auto": "⚡ Auto Search",
+        "btn_prefix": "🔮 Prefix / Suffix",
+        "btn_smart": "🧩 Smart Variations",
+        "btn_profile": "⚙️ Profile & Settings",
+        "btn_help": "💡 Help & Instructions",
         "back": "« Go Back",
         "main_menu": "« Main Menu",
-        "auto_title": "✦ <b>Auto Search</b>\n\nChoose desired username length (5 to 11 characters):",
-        "prefix_title": "✦ <b>Prefix Search</b>\n\nEnter the text or part of the name to start with:",
-        "smart_title": "✦ <b>Smart Variations</b>\n\nEnter a base word to generate unique combinations:",
-        "profile_title": "✦ <b>Personal Profile</b>\n\n▫ User ID: <code>{user_id}</code>\n▫ Total checks: {checks}\n▫ Saved tags: {saved_cnt}\n▫ History items: {hist_cnt}\n▫ Language: English",
-        "btn_saved": "▫ Saved Tags",
-        "btn_history": "▫ History",
+        "auto_title": "⚡ <b>Auto Search</b>\n\nChoose desired username length (5 to 11 characters):",
+        "prefix_title": "🔮 <b>Prefix Search</b>\n\nEnter the text or part of the name to start with:",
+        "smart_title": "🧩 <b>Smart Variations</b>\n\nEnter a base word to generate unique combinations:",
+        "profile_title": "⚙️ <b>Personal Profile</b>\n\n🔹 User ID: <code>{user_id}</code>\n🔹 Total checks: {checks}\n🔹 Saved tags: {saved_cnt}\n🔹 History items: {hist_cnt}\n🔹 Language: English",
+        "btn_saved": "⭐ Saved Tags",
+        "btn_history": "⏳ History",
         "btn_lang": "🌐 Language: English",
-        "saved_empty": "✦ <b>Saved Tags</b>\n\nYour saved list is empty.",
-        "saved_title": "✦ <b>Saved Tags</b>\n\n",
-        "history_empty": "✦ <b>Search History</b>\n\nYour history is empty.",
-        "history_title": "✦ <b>Search History</b>\n\n",
-        "help_text": "✦ <b>Help</b>\n\n1. Select a mode in the main menu.\n2. Specify parameters or enter a keyword.\n3. Get a free username and save it to your profile.",
-        "len_prompt": "✦ <b>Auto Search</b>\n\nSelected length: {length} characters.\nDo you want to include digits?",
-        "digits_yes": "✓ With Digits",
-        "digits_no": "✕ Letters Only",
-        "dcount_prompt": "✦ <b>Auto Search</b>\n\nLength: {length} characters.\nHow many digits to include?",
-        "scan_nodig": "✧ Scanning {length}-char username (no digits)...",
-        "scan_dig": "✧ Scanning username ({length} chars, {d_count} digits)...",
-        "scan_prefix": "✧ Searching for prefix «{prefix}»...",
-        "scan_smart": "✧ Generating variations for «{base}»...",
-        "err_not_found": "✦ <b>Error</b>\n\nNo free usernames found with these parameters.",
-        "err_prefix": "✦ <b>Error</b>\n\nNothing found with this prefix.",
-        "err_smart": "✦ <b>Error</b>\n\nCould not find free variations for this word.",
-        "res_title": "✦ <b>SEARCH RESULT</b>\n\n▫ Username: <code>{username}</code>\n▫ Length: {length} characters\n▫ Readability: {readability} / 10\n▫ Category: {category}\n▫ Status: Available for registration\n",
+        "saved_empty": "⭐ <b>Saved Tags</b>\n\nYour saved list is empty.",
+        "saved_title": "⭐ <b>Saved Tags</b>\n\n",
+        "history_empty": "⏳ <b>Search History</b>\n\nYour history is empty.",
+        "history_title": "⏳ <b>Search History</b>\n\n",
+        "help_text": "💡 <b>Help & Instructions</b>\n\n1. Select a mode in the main menu.\n2. Specify parameters or enter a keyword.\n3. Get a free username and save it to your profile.",
+        "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: {length} characters.\nDo you want to include digits?",
+        "digits_yes": "✔️ With Digits",
+        "digits_no": "❌ Letters Only",
+        "dcount_prompt": "⚡ <b>Auto Search</b>\n\nLength: {length} characters.\nHow many digits to include?",
+        "scan_nodig": "🔍 Scanning {length}-char username (no digits)...",
+        "scan_dig": "🔍 Scanning username ({length} chars, {d_count} digits)...",
+        "scan_prefix": "🔮 Searching for prefix «{prefix}»...",
+        "scan_smart": "🧩 Generating variations for «{base}»...",
+        "err_not_found": "⚠️ <b>Error</b>\n\nNo free usernames found with these parameters.",
+        "err_prefix": "⚠️ <b>Error</b>\n\nNothing found with this prefix.",
+        "err_smart": "⚠️ <b>Error</b>\n\nCould not find free variations for this word.",
+        "res_title": "💎 <b>SEARCH RESULT</b>\n\n🔸 Username: <code>{username}</code>\n🔸 Length: {length} characters\n🔸 Readability: {readability} / 10\n🔸 Category: {category}\n🔸 Status: Available for registration\n",
         "cat_prem": "Premium",
         "cat_std": "Standard",
         "cat_reg": "Regular",
-        "btn_open": "↗ Open Link",
-        "btn_save": "✓ Save",
-        "btn_retry": "↻ Search Again",
+        "btn_open": "↗️ Open Link",
+        "btn_save": "💾 Save",
+        "btn_retry": "🔄 Search Again",
         "saved_success": "Successfully saved: {uname}",
         "saved_already": "This item is already in your saved list.",
         "lang_changed": "Language changed to English."
     },
     "uk": {
         "welcome": "<b>Вітаю, {name}</b>\n\nОберіть необхідний розділ за допомогою меню нижче:",
-        "btn_auto": "✦ Автоматичний пошук",
-        "btn_prefix": "✦ Префікс / Суфікс",
-        "btn_smart": "✦ Розумні варіації",
-        "btn_profile": "✦ Профіль та налаштування",
-        "btn_help": "▫ Довідка та інструкція",
+        "btn_auto": "⚡ Автоматичний пошук",
+        "btn_prefix": "🔮 Префікс / Суфікс",
+        "btn_smart": "🧩 Розумні варіації",
+        "btn_profile": "⚙️ Профіль та налаштування",
+        "btn_help": "💡 Довідка та інструкція",
         "back": "« Повернутися назад",
         "main_menu": "« Головне меню",
-        "auto_title": "✦ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину імені (від 5 до 11 символів):",
-        "prefix_title": "✦ <b>Пошук за префіксом</b>\n\nВведіть текст або частину імені, з якої має починатися результат:",
-        "smart_title": "✦ <b>Розумні варіації</b>\n\nВведіть базове слово для генерації унікальних комбінацій:",
-        "profile_title": "✦ <b>Особистий профіль</b>\n\n▫ ID користувача: <code>{user_id}</code>\n▫ Загалом перевірок: {checks}\n▫ Збережено імен: {saved_cnt}\n▫ Історія запитів: {hist_cnt}\n▫ Мова: Українська",
-        "btn_saved": "▫ Збережені",
-        "btn_history": "▫ Історія",
+        "auto_title": "⚡ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину імені (від 5 до 11 символів):",
+        "prefix_title": "🔮 <b>Пошук за префіксом</b>\n\nВведіть текст або частину імені, з якої має починатися результат:",
+        "smart_title": "🧩 <b>Розумні варіації</b>\n\nВведіть базове слово для генерації унікальних комбінацій:",
+        "profile_title": "⚙️ <b>Особистий профіль</b>\n\n🔹 ID користувача: <code>{user_id}</code>\n🔹 Загалом перевірок: {checks}\n🔹 Збережено імен: {saved_cnt}\n🔹 Історія запитів: {hist_cnt}\n🔹 Мова: Українська",
+        "btn_saved": "⭐ Збережені",
+        "btn_history": "⏳ Історія",
         "btn_lang": "🌐 Мова: Українська",
-        "saved_empty": "✦ <b>Збережені імена</b>\n\nСписок збережених поки що порожній.",
-        "saved_title": "✦ <b>Збережені імена</b>\n\n",
-        "history_empty": "✦ <b>Історія перевірок</b>\n\nІсторія запитів порожня.",
-        "history_title": "✦ <b>Історія перевірок</b>\n\n",
-        "help_text": "✦ <b>Довідка</b>\n\n1. Виберіть потрібний режим у головному меню.\n2. Вкажіть параметри або введіть ключове слово.\n3. Отримайте вільне ім'я та збережіть його в профіль.",
-        "len_prompt": "✦ <b>Автоматичний пошук</b>\n\nОбрана довжина: {length} символів.\nЧи використовувати цифри у назві?",
-        "digits_yes": "✓ З цифрами",
-        "digits_no": "✕ Тільки букви",
-        "dcount_prompt": "✦ <b>Автоматичний пошук</b>\n\nДовжина: {length} символів.\nСкільки цифр додати?",
-        "scan_nodig": "✧ Сканування імені з {length} символів (без цифр)...",
-        "scan_dig": "✧ Сканування імені ({length} символів, {d_count} цифр)...",
-        "scan_prefix": "✧ Пошук за префіксом «{prefix}»...",
-        "scan_smart": "✧ Генерація варіацій для «{base}»...",
-        "err_not_found": "✦ <b>Помилка</b>\n\nВільних імен за вашими параметрами не знайдено.",
-        "err_prefix": "✦ <b>Помилка</b>\n\nНічого не знайдено за цим префіксом.",
-        "err_smart": "✦ <b>Помилка</b>\n\nНе вдалося знайти вільних варіацій для цього слова.",
-        "res_title": "✦ <b>РЕЗУЛЬТАТ ПОШУКУ</b>\n\n▫ Ім'я: <code>{username}</code>\n▫ Довжина: {length} символів\n▫ Читабельність: {readability} / 10\n▫ Категорія: {category}\n▫ Статус: Вільний для реєстрації\n",
+        "saved_empty": "⭐ <b>Збережені імена</b>\n\nСписок збережених поки що порожній.",
+        "saved_title": "⭐ <b>Збережені імена</b>\n\n",
+        "history_empty": "⏳ <b>Історія перевірок</b>\n\nІсторія запитів порожня.",
+        "history_title": "⏳ <b>Історія перевірок</b>\n\n",
+        "help_text": "💡 <b>Довідка та інструкція</b>\n\n1. Виберіть потрібний режим у головному меню.\n2. Вкажіть параметри або введіть ключове слово.\n3. Отримайте вільне ім'я та збережіть його в профіль.",
+        "len_prompt": "⚡ <b>Автоматичний пошук</b>\n\nОбрана довжина: {length} символів.\nЧи використовувати цифри у назві?",
+        "digits_yes": "✔️ З цифрами",
+        "digits_no": "❌ Тільки букви",
+        "dcount_prompt": "⚡ <b>Автоматичний пошук</b>\n\nДовжина: {length} символів.\nСкільки цифр додати?",
+        "scan_nodig": "🔍 Сканування імені з {length} символів (без цифр)...",
+        "scan_dig": "🔍 Сканування імені ({length} символів, {d_count} цифр)...",
+        "scan_prefix": "🔮 Пошук за префіксом «{prefix}»...",
+        "scan_smart": "🧩 Генерація варіацій для «{base}»...",
+        "err_not_found": "⚠️ <b>Помилка</b>\n\nВільних імен за вашими параметрами не знайдено.",
+        "err_prefix": "⚠️ <b>Помилка</b>\n\nНічого не знайдено за цим префіксом.",
+        "err_smart": "⚠️ <b>Помилка</b>\n\nНе вдалося знайти вільних варіацій для цього слова.",
+        "res_title": "💎 <b>РЕЗУЛЬТАТ ПОШУКУ</b>\n\n🔸 Ім'я: <code>{username}</code>\n🔸 Довжина: {length} символів\n🔸 Читабельність: {readability} / 10\n🔸 Категорія: {category}\n🔸 Статус: Вільний для реєстрації\n",
         "cat_prem": "Преміум",
         "cat_std": "Стандартний",
         "cat_reg": "Звичайний",
-        "btn_open": "↗ Відкрити посилання",
-        "btn_save": "✓ Зберегти",
-        "btn_retry": "↻ Шукати ще раз",
+        "btn_open": "↗️ Відкрити посилання",
+        "btn_save": "💾 Зберегти",
+        "btn_retry": "🔄 Шукати ще раз",
         "saved_success": "Успішно збережено: {uname}",
         "saved_already": "Цей елемент вже є у вашому списку.",
         "lang_changed": "Мову змінено на українську."
@@ -175,7 +175,7 @@ def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for length in range(5, 12):
-        row.append(InlineKeyboardButton(text=f"• {length}", callback_data=f"len:{length}"))
+        row.append(InlineKeyboardButton(text=f"✦ {length}", callback_data=f"len:{length}"))
         if len(row) == 3:
             buttons.append(row)
             row = []
@@ -198,7 +198,7 @@ def digits_count_keyboard(user_id: int, length: int) -> InlineKeyboardMarkup:
     row = []
     max_d = min(3, length - 1)
     for d in range(1, max_d + 1):
-        row.append(InlineKeyboardButton(text=f"• {d}", callback_data=f"dcount:{length}:{d}"))
+        row.append(InlineKeyboardButton(text=f"✦ {d}", callback_data=f"dcount:{length}:{d}"))
     if row:
         buttons.append(row)
     buttons.append([InlineKeyboardButton(text=t(user_id, "back"), callback_data=f"len:{length}")])
@@ -358,8 +358,7 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         
     elif action == "toggle_lang":
         profile["lang"] = "uk" if profile["lang"] == "en" else "en"
-        await callback.answer(t(user_id, "lang_changed"), show_alert=True)
-        # Повертаємось у профіль з оновленою мовою
+        
         saved_count = len(profile["saved"])
         history_count = len(profile["history"])
         text = t(user_id, "profile_title", user_id=user_id, checks=profile['checks_count'], saved_cnt=saved_count, hist_cnt=history_count)
@@ -374,6 +373,7 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text=t(user_id, "back"), callback_data="nav:main")]
         ])
         await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+        await callback.answer(t(user_id, "lang_changed"), show_alert=True)
         return
         
     elif action == "view_saved":
@@ -427,11 +427,59 @@ async def digits_choice_callback(callback: CallbackQuery):
         
         if not results:
             err_text = t(user_id, "err_not_found")
-            await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
-            return
+            await msg.edit_text(err_text, reply_markup=main_keyboard(user_id, "err_prefix")
+        await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        return
+        
+    username = results[0]
+    clean_u = username.lstrip('@')
+    text = format_result_card(user_id, username)
+    
+    buttons = [
+        [
+            InlineKeyboardButton(text=t(user_id, "btn_open"), url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text=t(user_id, "btn_save"), callback_data=f"save:{clean_u}")
+        ],
+        [InlineKeyboardButton(text=t(user_id, "main_menu"), callback_data="nav:main")]
+    ]
+    
+    await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
-        username = results[0]
-        clean_u = username.lstrip('@')
+@dp.message(BotStates.smart_variations)
+async def process_smart_variations(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    base = message.text.strip().lstrip("@")
+    await state.clear()
+    
+    profile = get_user_profile(user_id)
+    msg = await message.answer(t(user_id, "scan_smart", base=base), parse_mode="HTML")
+    
+    raw_variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
+    variations = []
+    for v in raw_variations:
+        if len(v) < 5:
+            v = v + "x" * (5 - len(v))
+        if len(v) <= 32 and v not in variations:
+            variations.append(v)
+    
+    free_found = []
+    timeout = aiohttp.ClientTimeout(total=2)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for var in variations:
+            if USERNAME_PATTERN.match(var) and await check_single_username(session, var):
+                free_found.append(f"@{var}")
+                break
+                
+    profile["checks_count"] += 1
+    add_to_history(user_id, free_found)
+            
+    if not free_found:
+        err_text = t(user_id, "err_smart")
+        await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        return
+        
+    username = free_found[0]
+    clean_u = username.lstrip('@')
     text = format_result_card(user_id, username)
     
     buttons = [
