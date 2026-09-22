@@ -20,7 +20,6 @@ from aiogram.types import (
     BufferedInputFile,
 )
 
-# 1. Налаштування логування (Технічні проблеми окремо у файл errors.log)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -37,15 +36,13 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
-ADMIN_ID = 5619415334  # Твій адміністративний ID
+ADMIN_ID = 5619415334
 USERNAME_PATTERN = re.compile(f"^[A-Za-z][A-Za-z0-9_]{{4,31}}$")
 
 # --- ІНІЦІАЛІЗАЦІЯ БАЗИ ДАНИХ ---
 def init_db():
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
-    
-    # Таблиця користувачів
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -54,8 +51,6 @@ def init_db():
             last_active TEXT
         )
     """)
-    
-    # Таблиця банів
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bans (
             user_id INTEGER PRIMARY KEY,
@@ -63,8 +58,6 @@ def init_db():
             ban_until TEXT
         )
     """)
-    
-    # Таблиця збережених тегів
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS saved_tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,8 +66,6 @@ def init_db():
             UNIQUE(user_id, username)
         )
     """)
-    
-    # Таблиця історії пошуку
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS search_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,13 +74,11 @@ def init_db():
             searched_at TEXT
         )
     """)
-    
     conn.commit()
     conn.close()
 
 init_db()
 
-# --- РОБОТА З БАЗОЮ ДАНИХ (Helper функції) ---
 def get_user_profile(user_id: int):
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
@@ -135,7 +124,6 @@ def is_user_banned(user_id: int):
     if ban_until != "forever":
         try:
             if datetime.now() > datetime.strptime(ban_until, "%Y-%m-%d %H:%M:%S"):
-                # Бан минув — видаляємо
                 unban_user(user_id)
                 return False, ""
         except Exception:
@@ -143,10 +131,7 @@ def is_user_banned(user_id: int):
     return True, reason
 
 def ban_user(user_id: int, reason: str, duration_days: int = 0):
-    if duration_days > 0:
-        ban_until = (datetime.now() + timedelta(days=duration_days)).strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        ban_until = "forever"
+    ban_until = (datetime.now() + timedelta(days=duration_days)).strftime("%Y-%m-%d %H:%M:%S") if duration_days > 0 else "forever"
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO bans (user_id, reason, ban_until) VALUES (?, ?, ?)", (user_id, reason, ban_until))
@@ -168,7 +153,6 @@ def add_to_history(user_id: int, username: str):
     conn.commit()
     conn.close()
 
-# Автоматичне очищення старих даних (історія старша за 14 днів)
 def cleanup_old_data():
     try:
         conn = sqlite3.connect("bot_database.db")
@@ -257,8 +241,6 @@ def t(user_id: int, key: str, **kwargs) -> str:
 
 class BotStates(StatesGroup):
     auto_search = State()
-    waiting_broadcast = State()
-    waiting_ban = State()
 
 def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -385,24 +367,19 @@ async def send_main_menu(message_or_callback, user_id: int, edit: bool = True):
     else:
         await message_or_callback.answer(text, reply_markup=markup, parse_mode="HTML")
 
-# --- ПЕРЕВІРКА НА БАН ПЕРЕД КОЖНИМ ПОВІДОМЛЕННЯМ ---
-@dp.message.middleware()
-async def ban_middleware(handler, event, data):
-    if event.from_user:
-        banned, reason = is_user_banned(event.from_user.id)
-        if banned:
-            await event.answer(f"⛔ Ви заблоковані в цьому боті.\nПричина: {reason}")
-            return
-    return await handler(event, data)
-
+# --- СТАРТ ТА ПЕРЕВІРКА БАНУ БЕЗ ПОМИЛКОВОГО MIDDLEWARE ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
-    await state.clear()
     user_id = message.from_user.id
+    banned, reason = is_user_banned(user_id)
+    if banned:
+        await message.answer(f"⛔ Ви заблоковані в цьому боті.\nПричина: {reason}")
+        return
+        
+    await state.clear()
     get_user_profile(user_id)
     await send_main_menu(message, user_id, edit=False)
 
-# --- АДМІН-ПАНЕЛЬ ТА ІНСТРУМЕНТИ ---
 @dp.message(Command("admin"))
 async def cmd_admin(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -459,7 +436,7 @@ async def cmd_ban(message: Message):
     try:
         target_id = int(args[1])
         days = int(args[2])
-        reason = args[3] if len(args) > 3. else "Порушення правил"
+        reason = args[3] if len(args) > 3 else "Порушення правил"
         ban_user(target_id, reason, days)
         await message.answer(f"✅ Користувача `{target_id}` заблоковано.", parse_mode="Markdown")
     except Exception as e:
@@ -501,4 +478,147 @@ async def cmd_broadcast(message: Message):
             pass
     await message.answer(f"✅ Розсилку завершено. Успішно надіслано: {sent} користувачам.")
 
-# --- CALLBA
+# --- CALLBACK ОБРОБНИКИ НАВІГАЦІЇ ---
+@dp.callback_query(F.data.startswith("nav:"))
+async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    banned, reason = is_user_banned(user_id)
+    if banned:
+        await callback.answer(f"⛔ Ви заблоковані: {reason}", show_alert=True)
+        return
+
+    await state.clear()
+    action = callback.data.split(":")[1]
+    profile = get_user_profile(user_id)
+    
+    if action == "main":
+        await send_main_menu(callback, user_id, edit=True)
+    elif action == "auto":
+        await state.set_state(BotStates.auto_search)
+        await callback.message.edit_text(t(user_id, "auto_title"), reply_markup=length_keyboard(user_id), parse_mode="HTML")
+    elif action == "toggle_lang":
+        new_lang = "uk" if profile["lang"] == "en" else "en"
+        update_user_lang(user_id, new_lang)
+        await send_main_menu(callback, user_id, edit=True)
+        await callback.answer(t(user_id, "lang_changed"), show_alert=True)
+        return
+    elif action == "updates":
+        await callback.message.edit_text(t(user_id, "updates_text"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+    elif action == "view_saved":
+        conn = sqlite3.connect("bot_database.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM saved_tags WHERE user_id = ?", (user_id,))
+        saved = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if not saved:
+            text = t(user_id, "saved_empty")
+        else:
+            items = [f"• <code>{u}</code>" for u in saved]
+            text = t(user_id, "saved_title") + "\n".join(items)
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
+    elif action == "view_history":
+        conn = sqlite3.connect("bot_database.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM search_history WHERE user_id = ? ORDER BY id DESC LIMIT 10", (user_id,))
+        history = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if not history:
+            text = t(user_id, "history_empty")
+        else:
+            items = [f"• <code>{u}</code>" for u in history]
+            text = t(user_id, "history_title") + "\n".join(items)
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
+    elif action == "help":
+        await callback.message.edit_text(t(user_id, "help_text"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+        
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("len:"))
+async def length_selected_callback(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    if is_user_banned(user_id)[0]:
+        return
+    length = int(callback.data.split(":")[1])
+    await callback.message.edit_text(t(user_id, "len_prompt", length=length), reply_markup=digits_choice_keyboard(user_id, length), parse_mode="HTML")
+
+@dp.callback_query(F.data.startswith("dig:"))
+async def digits_choice_callback(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    choice = parts[1]
+    length = int(parts[2])
+    user_id = callback.from_user.id
+    if is_user_banned(user_id)[0]:
+        return
+    
+    if choice == "yes":
+        await callback.message.edit_text(t(user_id, "dcount_prompt", length=length), reply_markup=digits_count_keyboard(user_id, length), parse_mode="HTML")
+    else:
+        msg = await callback.message.edit_text(t(user_id, "scan_nodig", length=length), parse_mode="HTML")
+        username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=False)
+        
+        increment_checks(user_id)
+        if username:
+            add_to_history(user_id, username)
+        
+        if not username:
+            await msg.edit_text(t(user_id, "err_not_found"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
+            return
+
+        clean_u = username.lstrip('@')
+        await msg.edit_text(format_result_card(user_id, username), reply_markup=get_result_keyboard(user_id, clean_u, f"len:{length}"), parse_mode="HTML", disable_web_page_preview=True)
+
+@dp.callback_query(F.data.startswith("dcount:"))
+async def digits_count_callback(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    length = int(parts[1])
+    d_count = int(parts[2])
+    user_id = callback.from_user.id
+    if is_user_banned(user_id)[0]:
+        return
+    
+    msg = await callback.message.edit_text(t(user_id, "scan_dig", length=length, d_count=d_count), parse_mode="HTML")
+    username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=True, digits_count=d_count)
+    
+    increment_checks(user_id)
+    if username:
+        add_to_history(user_id, username)
+    
+    if not username:
+        await msg.edit_text(t(user_id, "err_not_found"), reply_markup=main_keyboard(user_id), parse_mode="HTML")
+        return
+
+    clean_u = username.lstrip('@')
+    await msg.edit_text(format_result_card(user_id, username), reply_markup=get_result_keyboard(user_id, clean_u, f"len:{length}"), parse_mode="HTML", disable_web_page_preview=True)
+
+@dp.callback_query(F.data.startswith("save:"))
+async def save_username_callback(callback: CallbackQuery):
+    raw_uname = callback.data.split(":", 1)[1]
+    uname = f"@{raw_uname.lstrip('@')}"
+    user_id = callback.from_user.id
+    
+    try:
+        conn = sqlite3.connect("bot_database.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO saved_tags (user_id, username) VALUES (?, ?)", (user_id, uname))
+        conn.commit()
+        conn.close()
+        await callback.answer(t(user_id, "saved_success", uname=uname), show_alert=True)
+    except sqlite3.IntegrityError:
+        await callback.answer(t(user_id, "saved_already"), show_alert=True)
+
+async def background_cleanup_loop():
+    while True:
+        await asyncio.sleep(86400)
+        cleanup_old_data()
+
+async def main():
+    cleanup_old_data()
+    asyncio.create_task(background_cleanup_loop())
+    await bot.delete_webhook(drop_pending_updates=True)
+    logging.info("Pro Bot with cleaned handlers is starting...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
