@@ -225,25 +225,37 @@ async def generate_and_find_free(user_id: int, target_length: int = 6, use_digit
     letters = "abcdefghijklmnopqrstuvwxyz"
     digits = "0123456789"
     timeout = aiohttp.ClientTimeout(total=1.5)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        candidates = set()
-        for _ in range(35):
-            first = random.choice(letters)
-            if use_digits and digits_count > 0:
-                mid = "".join(random.choice(letters + "_") for _ in range(target_length - digits_count - 1))
-                digs = "".join(random.choice(digits) for _ in range(digits_count))
-                cand = first + mid + digs
-            else:
-                cand = first + "".join(random.choice(letters + "_") for _ in range(target_length - 1))
-            
-            if len(cand) == target_length:
-                candidates.add(cand)
+    
+    # Генеруємо пул кандидатів (наприклад, 40 штук за раз)
+    candidates = set()
+    for _ in range(40):
+        first = random.choice(letters)
+        if use_digits and digits_count > 0:
+            mid = "".join(random.choice(letters + "_") for _ in range(target_length - digits_count - 1))
+            digs = "".join(random.choice(digits) for _ in range(digits_count))
+            cand = first + mid + digs
+        else:
+            cand = first + "".join(random.choice(letters + "_") for _ in range(target_length - 1))
+        
+        if len(cand) == target_length and USERNAME_PATTERN.match(cand):
+            candidates.add(cand)
 
-        for candidate in candidates:
-            if USERNAME_PATTERN.match(candidate):
-                if await check_single_username(session, candidate):
-                    return f"@{candidate}"
+    if not candidates:
+        return ""
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        # Створюємо список задач для паралельної перевірки всіх кандидатів одночасно
+        tasks = [check_single_username(session, cand) for cand in candidates]
+        results = await asyncio.gather(*tasks)
+        
+        # Шукаємо перший успішний результат
+        candidates_list = list(candidates)
+        for i, is_free in enumerate(results):
+            if is_free:
+                return f"@{candidates_list[i]}"
+                
     return ""
+    
 
 def format_result_card(user_id: int, username: str) -> str:
     clean = username.lstrip("@")
@@ -398,4 +410,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-                                                                               
+    
