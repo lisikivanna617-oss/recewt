@@ -17,6 +17,7 @@ from aiogram.types import (
     Message,
 )
 
+# Налаштування логування
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
@@ -24,14 +25,14 @@ logging.basicConfig(
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    logging.error("BOT_TOKEN is missing!")
+    logging.critical("BOT_TOKEN environment variable is missing! Bot cannot start.")
+    exit(1)
 
-bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-USERNAME_PATTERN = re.compile(f"^[A-Za-z][A-Za-z0-9_]{{4,31}}$")
+USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
-# Невеликий вбудований словник популярних слів для мутації
 DICTIONARY_WORDS = [
     "blade", "cyber", "ghost", "shadow", "storm", "frost", "night", 
     "blood", "alpha", "omega", "viper", "cortex", "matrix", "nexus",
@@ -82,7 +83,7 @@ LANGS = {
         ),
         "btn_random_word": "🎲 Pick Random Word",
         "help_text": "✪ <b>Help & Instructions</b>\n\n1. Use Auto Search for random names.\n2. Use Dictionary Mutation to transform real words into unique free usernames.\n3. Save tags with personal notes directly!",
-        "len_prompt": "⚡ <b>Auto Search\n\nSelected length: {length} characters.\nDo you want to include digits?",
+        "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: {length} characters.\nDo you want to include digits?",
         "digits_yes": "☑ With Digits",
         "digits_no": "☒ Letters Only",
         "dcount_prompt": "⚡ <b>Auto Search</b>\n\nLength: {length} characters.\nHow many digits to include?",
@@ -172,7 +173,6 @@ class BotStates(StatesGroup):
     waiting_for_note = State()
 
 def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    profile = get_user_profile(user_id)
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text=t(user_id, "btn_auto"), callback_data="nav:auto"),
@@ -258,7 +258,6 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
             if resp.status != 200:
                 return False
             text = await resp.text()
-            
             if any(marker in text for marker in [
                 "is available on Telegram",
                 "you can set up",
@@ -269,7 +268,6 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
                 if "tgme_page_title" in text and "is available" not in text:
                     return False
                 return True
-                
             return False
     except Exception:
         return False
@@ -277,41 +275,29 @@ async def check_single_username(session: aiohttp.ClientSession, username: str) -
 def generate_mutations(word: str) -> set:
     word = word.lower().strip()
     mutations = set()
-    vowels = "aeiouy"
-    
-    # 1. Заміна голосних або приголосних на інші схожі літери / видалення
     vowels_map = {'a': 'e', 'e': 'i', 'i': 'y', 'o': 'u', 'u': 'a'}
     
-    # Заміна по черзі однієї букви
     for i in range(len(word)):
-        # Видалення букви
         mutations.add(word[:i] + word[i+1:])
-        # Заміна голосної
         if word[i] in vowels_map:
             mutations.add(word[:i] + vowels_map[word[i]] + word[i+1:])
-        # Подвоєння літери
         mutations.add(word[:i] + word[i] + word[i] + word[i+1:])
-        # Заміна на нижнє підкреслення
         mutations.add(word[:i] + "_" + word[i+1:])
 
-    # 2. Перестановка сусідніх літер
     for i in range(len(word) - 1):
         mutations.add(word[:i] + word[i+1] + word[i] + word[i+2:])
 
-    # 3. Додавання модифікаторів на кінець або початок
     suffixes = ["x", "cl", "hq", "io", "24"]
     for sfx in suffixes:
         mutations.add(f"{word}{sfx}")
         mutations.add(f"{sfx}{word}")
         mutations.add(f"{word}_{sfx}")
 
-    valid_mutations = {m for m in mutations if 5 <= len(m) <= 32 and USERNAME_PATTERN.match(m)}
-    return valid_mutations
+    return {m for m in mutations if 5 <= len(m) <= 32 and USERNAME_PATTERN.match(m)}
 
 async def generate_and_find_free(user_id: int, target_length: int = 6, use_digits: bool = True, digits_count: int = 1) -> str:
     letters = "abcdefghijklmnopqrstuvwxyz"
     digits = "0123456789"
-    
     timeout = aiohttp.ClientTimeout(total=1.5)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         candidates = set()
@@ -345,7 +331,6 @@ async def find_free_mutation(word: str) -> str:
 def format_result_card(user_id: int, username: str) -> str:
     clean = username.lstrip("@")
     length = len(clean)
-    
     readability = max(4, min(10, 11 - length))
     if "_" in clean or any(c.isdigit() for c in clean):
         readability = max(4, readability - 2)
@@ -390,23 +375,19 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     
     if action == "main":
         await send_main_menu(callback, user_id, edit=True)
-        
     elif action == "auto":
         await state.set_state(BotStates.auto_search)
         text = t(user_id, "auto_title")
         await callback.message.edit_text(text, reply_markup=length_keyboard(user_id), parse_mode="HTML")
-        
     elif action == "dict":
         await state.set_state(BotStates.dict_search)
         text = t(user_id, "dict_title")
         await callback.message.edit_text(text, reply_markup=dict_menu_keyboard(user_id), parse_mode="HTML")
-        
     elif action == "toggle_lang":
         profile["lang"] = "uk" if profile["lang"] == "en" else "en"
         await send_main_menu(callback, user_id, edit=True)
         await callback.answer(t(user_id, "lang_changed"), show_alert=True)
         return
-        
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
@@ -418,7 +399,6 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
                 items.append(f"• <code>{u}</code>{note_str}")
             text = t(user_id, "saved_title") + "\n".join(items)
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
-        
     elif action == "view_history":
         history = profile["history"]
         if not history:
@@ -427,7 +407,6 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
             items = [f"• <code>{u}</code>" for u in history[:10]]
             text = t(user_id, "history_title") + "\n".join(items)
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
-        
     elif action == "help":
         text = t(user_id, "help_text")
         await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
@@ -455,7 +434,6 @@ async def dict_random_callback(callback: CallbackQuery, state: FSMContext):
     clean_u = username.lstrip('@')
     text = format_result_card(user_id, username)
     markup = get_result_keyboard(user_id, clean_u, retry_callback="nav:dict")
-    
     await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 @dp.callback_query(F.data.startswith("len:"))
@@ -478,33 +456,7 @@ async def digits_choice_callback(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=digits_count_keyboard(user_id, length), parse_mode="HTML")
     else:
         msg = await callback.message.edit_text(t(user_id, "scan_nodig", length=length), parse_mode="HTML")
-        username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=False)
-        
-        profile["checks_count"] += 1
-        if username:
-            add_to_history(user_id, [username])
-        
-        if not username:
-            err_text = t(user_id, "err_not_found")
-            await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
-            return
-
-        clean_u = username.lstrip('@')
-        text = format_result_card(user_id, username)
-        markup = get_result_keyboard(user_id, clean_u, retry_callback=f"len:{length}")
-        
-        await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
-
-@dp.callback_query(F.data.startswith("dcount:"))
-async def digits_count_callback(callback: CallbackQuery):
-    parts = callback.data.split(":")
-    length = int(parts[1])
-    d_count = int(parts[2])
-    user_id = callback.from_user.id
-    profile = get_user_profile(user_id)
-    
-    msg = await callback.message.edit_text(t(user_id, "scan_dig", length=length, d_count=d_count), parse_mode="HTML")
-    username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=True, digits_count=d_count)
+        username = await generate_and_find_free(user_id=user_id, target_length=length, use_digits=True, digits_count=d_count)
     
     profile["checks_count"] += 1
     if username:
@@ -518,7 +470,6 @@ async def digits_count_callback(callback: CallbackQuery):
     clean_u = username.lstrip('@')
     text = format_result_card(user_id, username)
     markup = get_result_keyboard(user_id, clean_u, retry_callback=f"len:{length}")
-    
     await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 @dp.callback_query(F.data.startswith("save:"))
@@ -577,14 +528,13 @@ async def process_dict_search(message: Message, state: FSMContext):
     clean_u = username.lstrip('@')
     text = format_result_card(user_id, username)
     markup = get_result_keyboard(user_id, clean_u, retry_callback="nav:dict")
-    
     await msg.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 async def main():
+    # Видаляємо старі вебхуки та залишки, щоб Polling працював без затримок
     await bot.delete_webhook(drop_pending_updates=True)
+    logging.info("Bot is starting polling...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
- 
