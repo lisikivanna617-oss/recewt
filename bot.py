@@ -29,6 +29,9 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
+# Впиши сюди свій числовий ID в Telegram для доступу до адмін-панелі
+ADMIN_ID = YOUR_TELEGRAM_ID  # 5619415334
+
 USERNAME_PATTERN = re.compile(f"^[A-Za-z][A-Za-z0-9_]{{4,31}}$")
 
 user_data_store = {}
@@ -52,24 +55,32 @@ def add_to_history(user_id: int, usernames: list):
 
 LANGS = {
     "en": {
-        "welcome": "<b>Welcome, {name}</b>\n\nChoose an action below:",
+        "welcome": "<b>Welcome back, {name}!</b>\n\nSelect an option from the menu below:",
         "btn_auto": "⚡ Auto Search",
         "btn_saved": "☆ Saved Tags",
         "btn_history": "⏱ History",
-        "btn_lang": "🌐 Change Language (EN/UA)",
-        "btn_help": "✪ Help",
-        "back": "⎋ Go Back",
-        "main_menu": "⎋ Main Menu",
-        "auto_title": "⚡ <b>Auto Search</b>\n\nChoose desired username length (5 to 11 characters):",
-        "help_text": "✪ <b>Help & Instructions</b>\n\n1. Use Auto Search to find random available usernames.\n2. Save your favorite tags.\n3. Check your history anytime!",
-        "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: {length} characters.\nDo you want to include digits?",
+        "btn_updates": "✨ Updates №04 (22.09.26)",
+        "btn_lang": "🌐 Language: EN / UA",
+        "btn_help": "🛡 Help & Info",
+        "back": "‹ Back",
+        "main_menu": "⌂ Main Menu",
+        "auto_title": "⚡ <b>Auto Search</b>\n\nChoose the desired username length (5 to 11 characters):",
+        "help_text": "🛡 <b>Help & Instructions</b>\n\n1. Use <b>Auto Search</b> to find random available usernames instantly.\n2. Save your favorite tags using the star button.\n3. Access your history and saved items anytime from the menu.",
+        "updates_text": (
+            "✨ <b>Changelog & Updates №04 (22.09.26)</b>\n\n"
+            "• <b>Performance:</b> Implemented lightning-fast parallel username scanning using asynchronous routines.\n"
+            "• <b>Admin Tools:</b> Added a secure administrative panel with real-time usage statistics.\n"
+            "• <b>Interface:</b> Refreshed menu layout and improved localization handling.\n"
+            "• <b>Stability:</b> Fixed connection timeouts and optimized memory management."
+        ),
+        "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: <code>{length}</code> chars.\nDo you want to include digits?",
         "digits_yes": "☑ With Digits",
         "digits_no": "☒ Letters Only",
-        "dcount_prompt": "⚡ <b>Auto Search</b>\n\nLength: {length} characters.\nHow many digits to include?",
-        "scan_nodig": "⌕ Scanning {length}-char username (no digits)...",
+        "dcount_prompt": "⚡ <b>Auto Search</b>\n\nLength: <code>{length}</code> characters.\nHow many digits would you like to include?",
+        "scan_nodig": "⌕ Scanning {length}-char username (letters only)...",
         "scan_dig": "⌕ Scanning username ({length} chars, {d_count} digits)...",
-        "err_not_found": "⚠ <b>Error</b>\n\nNo free usernames found with these parameters. Try again!",
-        "res_title": "💎 <b>SEARCH RESULT</b>\n\n◌ Username: <code>{username}</code>\n◌ Length: {length} characters\n◌ Readability: {readability} / 10\n◌ Category: {category}\n◌ Status: Available for registration\n",
+        "err_not_found": "⚠ <b>No Results Found</b>\n\nCould not find available usernames with these parameters right now. Please try again!",
+        "res_title": "💎 <b>AVAILABLE USERNAME FOUND</b>\n\n◌ Username: <code>{username}</code>\n◌ Length: {length} characters\n◌ Readability: {readability} / 10\n◌ Category: {category}\n◌ Status: Free for registration\n",
         "cat_prem": "Premium",
         "cat_std": "Standard",
         "cat_reg": "Regular",
@@ -77,32 +88,40 @@ LANGS = {
         "btn_save": "☆ Save",
         "btn_retry": "↻ Try Again",
         "saved_success": "Successfully saved {uname}!",
-        "saved_already": "This item is already in your saved list.",
-        "saved_empty": "☆ <b>Saved Tags</b>\n\nYour saved list is empty.",
+        "saved_already": "This tag is already in your saved list.",
+        "saved_empty": "☆ <b>Saved Tags</b>\n\nYour saved list is currently empty.",
         "saved_title": "☆ <b>Saved Tags</b>\n\n",
-        "history_empty": "⏱ <b>Search History</b>\n\nYour history is empty.",
+        "history_empty": "⏱ <b>Search History</b>\n\nYour history is currently empty.",
         "history_title": "⏱ <b>Search History</b>\n\n",
-        "lang_changed": "Language changed to English."
+        "lang_changed": "Language successfully switched to English."
     },
     "uk": {
-        "welcome": "<b>Вітаю, {name}</b>\n\nОберіть дію нижче:",
+        "welcome": "<b>Вітаю, {name}!</b>\n\nОберіть потрібну дію в меню нижче:",
         "btn_auto": "⚡ Автоматичний пошук",
         "btn_saved": "☆ Збережені теги",
         "btn_history": "⏱ Історія",
-        "btn_lang": "🌐 Змінити мову (EN/UA)",
-        "btn_help": "✪ Довідка",
-        "back": "⎋ Повернутися назад",
-        "main_menu": "⎋ Головне меню",
-        "auto_title": "⚡ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину імені (від 5 до 11 символів):",
-        "help_text": "✪ <b>Довідка та інструкція</b>\n\n1. Використовуйте автопошук для пошуку вільних юзернеймів.\n2. Зберігайте улюблені варіанти.\n3. Переглядайте історію запитів!",
-        "len_prompt": "⚡ <b>Автоматичний пошук</b>\n\nОбрана довжина: {length} символів.\nЧи використовувати цифри у назві?",
+        "btn_updates": "✨ Оновлення №04 (22.09.26)",
+        "btn_lang": "🌐 Мова: UA / EN",
+        "btn_help": "🛡 Довідка",
+        "back": "‹ Назад",
+        "main_menu": "⌂ Головне меню",
+        "auto_title": "⚡ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину нікнейма (від 5 до 11 символів):",
+        "help_text": "🛡 <b>Довідка та інструкція</b>\n\n1. Використовуйте <b>Автопошук</b> для швидкого знаходження вільних імен.\n2. Зберігайте улюблені варіанти у списку обраних.\n3. Переглядайте історію попередніх запитів у будь-який момент.",
+        "updates_text": (
+            "✨ <b>Список оновлень №04 (22.09.26)</b>\n\n"
+            "• <b>Швидкодія:</b> Інтегровано паралельний сканер для миттєвої перевірки десятків варіантів одночасно.\n"
+            "• <b>Адміністрування:</b> Додано повноцінну панель управління з поточною статистикою бота.\n"
+            "• <b>Інтерфейс:</b> Оновлено дизайн кнопок, покращено навігацію та локалізацію.\n"
+            "• <b>Стабільність:</b> Усунуто затримки в мережі та оптимізовано роботу пам'яті."
+        ),
+        "len_prompt": "⚡ <b>Автоматичний пошук</b>\n\nОбрана довжина: <code>{length}</code> симв.\nЧи використовувати цифри у назві?",
         "digits_yes": "☑ З цифрами",
         "digits_no": "☒ Тільки букви",
-        "dcount_prompt": "⚡ <b>Автоматичний пошук</b>\n\nДовжина: {length} символів.\nСкільки цифр додати?",
+        "dcount_prompt": "⚡ <b>Автоматичний пошук</b>\n\nДовжина: <code>{length}</code> символів.\nСкільки цифр бажаєте додати?",
         "scan_nodig": "⌕ Сканування імені з {length} символів (без цифр)...",
         "scan_dig": "⌕ Сканування імені ({length} символів, {d_count} цифр)...",
-        "err_not_found": "⚠ <b>Помилка</b>\n\nВільних імен за вашими параметрами не знайдено. Спробуйте ще!",
-        "res_title": "💎 <b>РЕЗУЛЬТАТ ПОШУКУ</b>\n\n◌ Ім'я: <code>{username}</code>\n◌ Довжина: {length} символів\n◌ Читабельність: {readability} / 10\n◌ Категорія: {category}\n◌ Статус: Вільний для реєстрації\n",
+        "err_not_found": "⚠ <b>Нічого не знайдено</b>\n\nЗа заданими параметрами вільних імен зараз немає. Спробуйте ще раз!",
+        "res_title": "💎 <b>ВІЛЬНИЙ ЮЗЕРНЕЙМ ЗНАЙДЕНО</b>\n\n◌ Ім'я: <code>{username}</code>\n◌ Довжина: {length} символів\n◌ Читабельність: {readability} / 10\n◌ Категорія: {category}\n◌ Статус: Вільний для реєстрації\n",
         "cat_prem": "Преміум",
         "cat_std": "Стандартний",
         "cat_reg": "Звичайний",
@@ -110,12 +129,12 @@ LANGS = {
         "btn_save": "☆ Зберегти",
         "btn_retry": "↻ Повторити спробу",
         "saved_success": "Успішно збережено {uname}!",
-        "saved_already": "Цей елемент вже є у вашому списку.",
-        "saved_empty": "☆ <b>Збережені теги</b>\n\nСписок збережених поки що порожній.",
+        "saved_already": "Цей тег вже є у вашому списку.",
+        "saved_empty": "☆ <b>Збережені теги</b>\n\nВаш список збережених поки що порожній.",
         "saved_title": "☆ <b>Збережені теги</b>\n\n",
-        "history_empty": "⏱ <b>Історія перевірок</b>\n\nІсторія запитів порожня.",
+        "history_empty": "⏱ <b>Історія перевірок</b>\n\nІсторія запитів поки що порожня.",
         "history_title": "⏱ <b>Історія перевірок</b>\n\n",
-        "lang_changed": "Мову змінено на українську."
+        "lang_changed": "Мову успішно змінено на українську."
     }
 }
 
@@ -137,6 +156,7 @@ def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=t(user_id, "btn_saved"), callback_data="nav:view_saved"),
             InlineKeyboardButton(text=t(user_id, "btn_history"), callback_data="nav:view_history"),
         ],
+        [InlineKeyboardButton(text=t(user_id, "btn_updates"), callback_data="nav:updates")],
         [
             InlineKeyboardButton(text=t(user_id, "btn_lang"), callback_data="nav:toggle_lang"),
             InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help"),
@@ -150,7 +170,7 @@ def length_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for length in range(5, 12):
-        row.append(InlineKeyboardButton(text=f"○ {length}", callback_data=f"len:{length}"))
+        row.append(InlineKeyboardButton(text=f"• {length}", callback_data=f"len:{length}"))
         if len(row) == 3:
             buttons.append(row)
             row = []
@@ -173,7 +193,7 @@ def digits_count_keyboard(user_id: int, length: int) -> InlineKeyboardMarkup:
     row = []
     max_d = min(3, length - 1)
     for d in range(1, max_d + 1):
-        row.append(InlineKeyboardButton(text=f"○ {d}", callback_data=f"dcount:{length}:{d}"))
+        row.append(InlineKeyboardButton(text=f"• {d}", callback_data=f"dcount:{length}:{d}"))
     if row:
         buttons.append(row)
     buttons.append([InlineKeyboardButton(text=t(user_id, "back"), callback_data=f"len:{length}")])
@@ -226,7 +246,6 @@ async def generate_and_find_free(user_id: int, target_length: int = 6, use_digit
     digits = "0123456789"
     timeout = aiohttp.ClientTimeout(total=1.5)
     
-    # Генеруємо пул кандидатів (наприклад, 40 штук за раз)
     candidates = set()
     for _ in range(40):
         first = random.choice(letters)
@@ -244,18 +263,15 @@ async def generate_and_find_free(user_id: int, target_length: int = 6, use_digit
         return ""
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        # Створюємо список задач для паралельної перевірки всіх кандидатів одночасно
         tasks = [check_single_username(session, cand) for cand in candidates]
         results = await asyncio.gather(*tasks)
         
-        # Шукаємо перший успішний результат
         candidates_list = list(candidates)
         for i, is_free in enumerate(results):
             if is_free:
                 return f"@{candidates_list[i]}"
                 
     return ""
-    
 
 def format_result_card(user_id: int, username: str) -> str:
     clean = username.lstrip("@")
@@ -286,7 +302,26 @@ async def send_main_menu(message_or_callback, user_id: int, edit: bool = True):
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
+    get_user_profile(user_id)
     await send_main_menu(message, user_id, edit=False)
+
+@dp.message(Command("admin"))
+async def cmd_admin(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⚠ У вас немає прав доступу до цієї панелі.")
+        return
+    
+    total_users = len(user_data_store)
+    total_checks = sum(p["checks_count"] for p in user_data_store.values())
+    total_saved = sum(len(p["saved"]) for p in user_data_store.values())
+    
+    admin_text = (
+        "🛡 <b>Панель адміністратора</b>\n\n"
+        f"👥 Унікальних користувачів: <code>{total_users}</code>\n"
+        f"📊 Всього перевірок виконано: <code>{total_checks}</code>\n"
+        f"💾 Всього збережено тегів: <code>{total_saved}</code>"
+    )
+    await message.answer(admin_text, parse_mode="HTML", reply_markup=back_keyboard(message.from_user.id))
 
 @dp.callback_query(F.data.startswith("nav:"))
 async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
@@ -306,6 +341,9 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await send_main_menu(callback, user_id, edit=True)
         await callback.answer(t(user_id, "lang_changed"), show_alert=True)
         return
+    elif action == "updates":
+        text = t(user_id, "updates_text")
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
@@ -410,4 +448,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
