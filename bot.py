@@ -427,7 +427,7 @@ async def digits_choice_callback(callback: CallbackQuery):
         
         if not results:
             err_text = t(user_id, "err_not_found")
-            await msg.edit_text(err_text, reply_markup=main_keyboard(user_id, "err_prefix")
+            await msg.edit_text(err_text, reply_markup=main_keyboard)(user_id, "err_prefix")
         await msg.edit_text(err_text, reply_markup=main_keyboard(user_id), parse_mode="HTML")
         return
         
