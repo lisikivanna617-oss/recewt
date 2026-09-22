@@ -52,16 +52,11 @@ def add_to_history(user_id: int, usernames: list):
 
 LANGS = {
     "en": {
-        "welcome": (
-            "<b>Welcome in bot @thetagtrackbot, {name}</b>\n\n"
-            "🆔 ID: <code>{user_id}</code>\n"
-            "📊 Checks: {checks} | 💾 Saved: {saved_cnt}\n"
-            "🌐 Language: English\n\n"
-            "Choose an action below:"
-        ),
+        "welcome": "<b>Welcome, {name}</b>\n\nChoose an action below:",
         "btn_auto": "⚡ Auto Search",
         "btn_saved": "☆ Saved Tags",
         "btn_history": "⏱ History",
+        "btn_profile": "👤 Profile",
         "btn_lang": "🌐 Change Language (EN/UA)",
         "btn_help": "✪ Help",
         "back": "⎋ Go Back",
@@ -88,19 +83,15 @@ LANGS = {
         "saved_title": "☆ <b>Saved Tags</b>\n\n",
         "history_empty": "⏱ <b>Search History</b>\n\nYour history is empty.",
         "history_title": "⏱ <b>Search History</b>\n\n",
+        "profile_text": "👤 <b>User Profile</b>\n\n🆔 ID: <code>{user_id}</code>\n📊 Total checks: {checks}\n💾 Saved tags: {saved_cnt}\n🌐 Language: English",
         "lang_changed": "Language changed to English."
     },
     "uk": {
-        "welcome": (
-            "<b>Вітаю, {name}</b>\n\n"
-            "🆔 ID: <code>{user_id}</code>\n"
-            "📊 Перевірок: {checks} | 💾 Збережено: {saved_cnt}\n"
-            "🌐 Мова: Українська\n\n"
-            "Оберіть дію нижче:"
-        ),
+        "welcome": "<b>Вітаю, {name}</b>\n\nОберіть дію нижче:",
         "btn_auto": "⚡ Автоматичний пошук",
         "btn_saved": "☆ Збережені теги",
         "btn_history": "⏱ Історія",
+        "btn_profile": "👤 Профіль",
         "btn_lang": "🌐 Змінити мову (EN/UA)",
         "btn_help": "✪ Довідка",
         "back": "⎋ Повернутися назад",
@@ -127,6 +118,7 @@ LANGS = {
         "saved_title": "☆ <b>Збережені теги</b>\n\n",
         "history_empty": "⏱ <b>Історія перевірок</b>\n\nІсторія запитів порожня.",
         "history_title": "⏱ <b>Історія перевірок</b>\n\n",
+        "profile_text": "👤 <b>Профіль користувача</b>\n\n🆔 ID: <code>{user_id}</code>\n📊 Всього перевірок: {checks}\n💾 Збережено тегів: {saved_cnt}\n🌐 Мова: Українська",
         "lang_changed": "Мову змінено на українську."
     }
 }
@@ -150,9 +142,10 @@ def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=t(user_id, "btn_history"), callback_data="nav:view_history"),
         ],
         [
+            InlineKeyboardButton(text=t(user_id, "btn_profile"), callback_data="nav:profile"),
             InlineKeyboardButton(text=t(user_id, "btn_lang"), callback_data="nav:toggle_lang"),
-            InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help"),
-        ]
+        ],
+        [InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help")]
     ])
 
 def back_keyboard(user_id: int) -> InlineKeyboardMarkup:
@@ -275,14 +268,7 @@ def format_result_card(user_id: int, username: str) -> str:
 
 async def send_main_menu(message_or_callback, user_id: int, edit: bool = True):
     name = html.escape(message_or_callback.from_user.first_name)
-    profile = get_user_profile(user_id)
-    text = t(
-        user_id, "welcome", 
-        name=name, 
-        user_id=user_id, 
-        checks=profile['checks_count'], 
-        saved_cnt=len(profile["saved"])
-    )
+    text = t(user_id, "welcome", name=name)
     markup = main_keyboard(user_id)
     if edit:
         await message_or_callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
@@ -313,6 +299,9 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         await send_main_menu(callback, user_id, edit=True)
         await callback.answer(t(user_id, "lang_changed"), show_alert=True)
         return
+    elif action == "profile":
+        text = t(user_id, "profile_text", user_id=user_id, checks=profile["checks_count"], saved_cnt=len(profile["saved"]))
+        await callback.message.edit_text(text, reply_markup=back_keyboard(user_id), parse_mode="HTML")
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
