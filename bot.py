@@ -462,7 +462,7 @@ async def cmd_ban(message: Message):
     if len(args) < 3:
         await message.answer("Формат: `/ban user_id дні причина`", parse_mode="Markdown")
         return
-     try:
+    try:
         target_id = int(args[1])
         days = int(args[2])
         reason = args[3] if len(args) > 3 else "Порушення правил"
