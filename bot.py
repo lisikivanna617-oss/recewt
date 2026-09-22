@@ -57,41 +57,41 @@ class BotStates(StatesGroup):
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="[ ⌕ Auto-Search ]", callback_data="menu:auto"),
-            InlineKeyboardButton(text="[ ⌯ Prefix / Suffix ]", callback_data="menu:prefix"),
+            InlineKeyboardButton(text="‹ø› SCAN: AUTO", callback_data="nx:auto"),
+            InlineKeyboardButton(text="‹ø› SCAN: PREFIX", callback_data="nx:prefix"),
         ],
         [
-            InlineKeyboardButton(text="[ ⌬ Smart Variations ]", callback_data="menu:smart"),
-            InlineKeyboardButton(text="[ ⎋ Profile & Saved ]", callback_data="menu:profile"),
+            InlineKeyboardButton(text="‹ø› MUTATE: SMART", callback_data="nx:smart"),
+            InlineKeyboardButton(text="‹ø› VAULT: PROFILE", callback_data="nx:profile"),
         ],
         [
-            InlineKeyboardButton(text="[ ⓘ Help ]", callback_data="menu:help"),
+            InlineKeyboardButton(text="‹ø› MANIFEST: HELP", callback_data="nx:help"),
         ]
     ])
 
 def back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="[ ↶ Return ]", callback_data="menu:main")]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="« ABORT / RETURN", callback_data="nx:main")]])
 
 def length_keyboard() -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for length in range(5, 12):
-        row.append(InlineKeyboardButton(text=f"[{length}]", callback_data=f"len:{length}"))
+        row.append(InlineKeyboardButton(text=f"[{length}L]", callback_data=f"len:{length}"))
         if len(row) == 3:
             buttons.append(row)
             row = []
     if row:
         buttons.append(row)
-    buttons.append([InlineKeyboardButton(text="[ ↶ Return ]", callback_data="menu:main")])
+    buttons.append([InlineKeyboardButton(text="« ABORT / RETURN", callback_data="nx:main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def digits_choice_keyboard(length: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="[ ☑ With Digits ]", callback_data=f"digits:yes:{length}"),
-            InlineKeyboardButton(text="[ ☒ Letters Only ]", callback_data=f"digits:no:{length}")
+            InlineKeyboardButton(text="[+] WITH DIGITS", callback_data=f"dig:1:{length}"),
+            InlineKeyboardButton(text="[-] LETTERS ONLY", callback_data=f"dig:0:{length}")
         ],
-        [InlineKeyboardButton(text="[ ↶ Return ]", callback_data="menu:auto")]
+        [InlineKeyboardButton(text="« ABORT / RETURN", callback_data="nx:auto")]
     ])
 
 def digits_count_keyboard(length: int) -> InlineKeyboardMarkup:
@@ -99,10 +99,10 @@ def digits_count_keyboard(length: int) -> InlineKeyboardMarkup:
     row = []
     max_d = min(3, length - 1)
     for d in range(1, max_d + 1):
-        row.append(InlineKeyboardButton(text=f"[{d} digit(s)]", callback_data=f"dcount:{length}:{d}"))
+        row.append(InlineKeyboardButton(text=f"[{d} DIG]", callback_data=f"dc:{length}:{d}"))
     if row:
         buttons.append(row)
-    buttons.append([InlineKeyboardButton(text="[ ↶ Return ]", callback_data=f"len:{length}")])
+    buttons.append([InlineKeyboardButton(text="« ABORT / RETURN", callback_data=f"len:{length}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 async def check_single_username(session: aiohttp.ClientSession, username: str) -> bool:
@@ -137,10 +137,10 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
     max_attempts = 100
     
     steps = [
-        ("┌ [ ϟ ] connecting to t.me gateway...", 20),
-        ("├ [ ⌕ ] bypassing filters & scanning...", 50),
-        ("├ [ ⌬ ] cross-checking availability...", 80),
-        ("└ [ ☑ ] target acquired!", 100),
+        ("SYSTEM_LOG // INIT_SOCKET...", 20),
+        ("SYSTEM_LOG // BYPASSING_FILTERS...", 50),
+        ("SYSTEM_LOG // PROBING_NODES...", 80),
+        ("SYSTEM_LOG // TARGET_LOCKED.", 100),
     ]
 
     step_index = 0
@@ -157,7 +157,7 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
             
             if attempts % 25 == 0 and step_index < len(steps):
                 try:
-                    text, _ = steps[step_index]
+                    text = f"[#] {steps[step_index][0]}"
                     await message_to_edit.edit_text(text, parse_mode="HTML")
                     step_index += 1
                 except Exception:
@@ -213,24 +213,20 @@ def format_result_card(username: str) -> str:
         readability = max(4, readability - 2)
         
     if length <= 5:
-        price = "$25 - $60"
+        tier = "ALPHA_TIER"
     elif length == 6:
-        price = "$10 - $25"
+        tier = "BETA_TIER"
     else:
-        price = "$3 - $10"
+        tier = "STANDARD_TIER"
         
-    liquidity = max(4, min(9, readability - 1))
-    
     return (
-        f"┌─[ STATUS: AVAILABLE ]\n"
-        f"│\n"
-        f"├ target: <code>{username}</code>\n"
-        f"├ length: {length} chars\n"
-        f"├ readability: {readability}/10\n"
-        f"├ est. value: {price}\n"
-        f"├ liquidity: {liquidity}/10\n"
-        f"└ status: [ ☑ FREE ]\n\n"
-        f"◇ Core tagtrack system"
+        f"=== NODE_REPORT ===\n"
+        f"[§] TARGET: <code>{username}</code>\n"
+        f"[§] LENGTH: {length} bytes\n"
+        f"[§] INDEX: {readability}/10\n"
+        f"[§] CLASS: {tier}\n"
+        f"[§] STATE: [UNCLAIMED]\n"
+        f"==================="
     )
 
 @dp.message(Command("start"))
@@ -238,15 +234,15 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     name = html.escape(message.from_user.first_name)
     text = (
-        f"┌─[ TAG TRACK SYSTEM v2.5 ]\n"
-        f"│\n"
-        f"├ welcome back, {name}\n"
-        f"├ status: [ ϟ ONLINE ]\n"
-        f"└ select interface node:"
+        f"// SESSION_ACTIVE //\n"
+        f"OPERATOR: {name}\n"
+        f"HOST: SECURE_CORE_v9\n"
+        f"---------------------\n"
+        f"CHOOSE EXECUTION VECTOR:"
     )
     await message.answer(text, reply_markup=main_keyboard(), parse_mode="HTML")
 
-@dp.callback_query(F.data.startswith("menu:"))
+@dp.callback_query(F.data.startswith("nx:"))
 async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     await state.clear()
@@ -256,27 +252,27 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     if action == "main":
         name = html.escape(callback.from_user.first_name)
         text = (
-            f"┌─[ TAG TRACK SYSTEM v2.5 ]\n"
-            f"│\n"
-            f"├ welcome back, {name}\n"
-            f"├ status: [ ϟ ONLINE ]\n"
-            f"└ select interface node:"
+            f"// SESSION_ACTIVE //\n"
+            f"OPERATOR: {name}\n"
+            f"HOST: SECURE_CORE_v9\n"
+            f"---------------------\n"
+            f"CHOOSE EXECUTION VECTOR:"
         )
         await callback.message.edit_text(text, reply_markup=main_keyboard(), parse_mode="HTML")
         
     elif action == "auto":
         await state.set_state(BotStates.auto_search)
-        text = "┌─[ ⌕ AUTO-SEARCH MODULE ]\n└ select exact length (5-11):"
+        text = ">> PROTOCOL: AUTO_SCAN\n[?] SELECT BYTE LENGTH (5-11):"
         await callback.message.edit_text(text, reply_markup=length_keyboard(), parse_mode="HTML")
         
     elif action == "prefix":
         await state.set_state(BotStates.prefix_search)
-        text = "┌─[ ⌯ PREFIX / SUFFIX MODULE ]\n└ enter custom prefix:"
+        text = ">> PROTOCOL: PREFIX_SCAN\n[?] INPUT STRING ANCHOR:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "smart":
         await state.set_state(BotStates.smart_variations)
-        text = "┌─[ ⌬ SMART VARIATIONS ]\n└ enter base name:"
+        text = ">> PROTOCOL: SMART_MUTATE\n[?] INPUT BASE SEED:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "profile":
@@ -284,48 +280,47 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         history_count = len(profile["history"])
         
         text = (
-            f"┌─[ ⎋ USER DASHBOARD ]\n"
-            f"│\n"
-            f"├ id: <code>{user_id}</code>\n"
-            f"├ total checks: {profile['checks_count']}\n"
-            f"├ saved tags: {saved_count}\n"
-            f"└ history items: {history_count}"
+            f"=== USER_VAULT ===\n"
+            f"UID: {user_id}\n"
+            f"QUERIES_RUN: {profile['checks_count']}\n"
+            f"CACHED_ITEMS: {saved_count}\n"
+            f"LOG_ENTRIES: {history_count}\n"
+            f"=================="
         )
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="[ ⌕ Saved ]", callback_data="menu:view_saved"),
-                InlineKeyboardButton(text="[ ⌬ History ]", callback_data="menu:view_history")
+                InlineKeyboardButton(text="[VIEW VAULT]", callback_data="nx:view_saved"),
+                InlineKeyboardButton(text="[VIEW LOGS]", callback_data="nx:view_history")
             ],
-            [InlineKeyboardButton(text="[ ↶ Return ]", callback_data="menu:main")]
+            [InlineKeyboardButton(text="« ABORT / RETURN", callback_data="nx:main")]
         ])
         await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
-            text = "┌─[ ⌕ SAVED TAGS ]\n└ folder is empty."
+            text = "=== VAULT ===\nSTATUS: EMPTY BUFFER."
         else:
-            items = [f"├ <code>{u}</code>" for u in saved]
-            text = "┌─[ ⌕ SAVED TAGS ]\n│\n" + "\n".join(items) + "\n└ —"
+            items = [f" > <code>{u}</code>" for u in saved]
+            text = "=== STORED_ITEMS ===\n" + "\n".join(items)
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "view_history":
         history = profile["history"]
         if not history:
-            text = "┌─[ ⌬ HISTORY ]\n└ no recent checks."
+            text = "=== LOGS ===\nSTATUS: NO RECENT ACTIVITY."
         else:
-            items = [f"├ <code>{u}</code>" for u in history[:10]]
-            text = "┌─[ ⌬ RECENT HISTORY ]\n│\n" + "\n".join(items) + "\n└ —"
+            items = [f" ~ <code>{u}</code>" for u in history[:10]]
+            text = "=== RECENT_LOGS ===\n" + "\n".join(items)
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "help":
         text = (
-            f"┌─[ ⓘ SYSTEM GUIDE ]\n"
-            f"│\n"
-            f"├ choose target length or prefix\n"
-            f"├ execute scanner node\n"
-            f"└ archive found items to profile\n"
-            f"└ —"
+            "=== MANIFEST ===\n"
+            "1. SELECT SCAN PARAMETERS\n"
+            "2. EXECUTE THREAD POOL\n"
+            "3. EXPORT TARGETS TO VAULT\n"
+            "=================="
         )
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
@@ -334,29 +329,29 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
     length = int(callback.data.split(":")[1])
-    text = f"┌─[ ⌕ AUTO-SEARCH ]\n├ length: {length} chars\n└ include digits (0-9)?"
+    text = f">> LENGTH_LOCKED: {length}\n[?] ALLOW NUMERIC DIGITS?"
     await callback.message.edit_text(text, reply_markup=digits_choice_keyboard(length), parse_mode="HTML")
 
-@dp.callback_query(F.data.startswith("digits:"))
+@dp.callback_query(F.data.startswith("dig:"))
 async def digits_choice_callback(callback: CallbackQuery):
     parts = callback.data.split(":")
-    choice = parts[1]
+    use_dig = int(parts[1])
     length = int(parts[2])
     user_id = callback.from_user.id
     profile = get_user_profile(user_id)
     
-    if choice == "yes":
-        text = f"┌─[ ⌕ AUTO-SEARCH ]\n├ length: {length} chars\n└ select digits count (1-3):"
+    if use_dig == 1:
+        text = f">> CONFIG: {length}L + DIGITS\n[?] SELECT DIGIT DENSITY (1-3):"
         await callback.message.edit_text(text, reply_markup=digits_count_keyboard(length), parse_mode="HTML")
     else:
-        msg = await callback.message.edit_text(f"┌ [ ⌕ ] scanning {length}-char tag (no digits)...", parse_mode="HTML")
+        msg = await callback.message.edit_text(f"[#] INITIALIZING {length}L PURE-STRING SCAN...", parse_mode="HTML")
         results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=False, count=1)
         
         profile["checks_count"] += 1
         add_to_history(user_id, results)
         
         if not results:
-            err_text = "┌─[ ☒ ERROR ]\n└ no free tags found, try again."
+            err_text = "=== ERROR ===\n[!] TIMEOUT: NO FREE NODES FOUND."
             await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
             return
 
@@ -366,18 +361,18 @@ async def digits_choice_callback(callback: CallbackQuery):
         
         buttons = [
             [
-                InlineKeyboardButton(text="[ ⎋ Open Link ]", url=f"https://t.me/{clean_u}"),
-                InlineKeyboardButton(text="[ ☑ Save ]", callback_data=f"save:{clean_u}")
+                InlineKeyboardButton(text="[EXTERNAL LINK]", url=f"https://t.me/{clean_u}"),
+                InlineKeyboardButton(text="[SAVE TO VAULT]", callback_data=f"save:{clean_u}")
             ],
             [
-                InlineKeyboardButton(text="[ ϟ Next Scan ]", callback_data=f"len:{length}")
+                InlineKeyboardButton(text="[RE-SCAN SAME]", callback_data=f"len:{length}")
             ],
-            [InlineKeyboardButton(text="[ ↶ Main Menu ]", callback_data="menu:main")]
+            [InlineKeyboardButton(text="« ROOT MENU", callback_data="nx:main")]
         ]
         
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
-@dp.callback_query(F.data.startswith("dcount:"))
+@dp.callback_query(F.data.startswith("dc:"))
 async def digits_count_callback(callback: CallbackQuery):
     parts = callback.data.split(":")
     length = int(parts[1])
@@ -385,14 +380,14 @@ async def digits_count_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     profile = get_user_profile(user_id)
     
-    msg = await callback.message.edit_text(f"┌ [ ⌕ ] scanning {length}-char tag with {d_count} digit(s)...", parse_mode="HTML")
+    msg = await callback.message.edit_text(f"[#] SCANNING {length}L WITH {d_count} DIGIT(S)...", parse_mode="HTML")
     results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=True, digits_count=d_count, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ ☒ ERROR ]\n└ no free tags found with these parameters."
+        err_text = "=== ERROR ===\n[!] TIMEOUT: NO MATCHING NODES FOUND."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
 
@@ -402,13 +397,13 @@ async def digits_count_callback(callback: CallbackQuery):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ⎋ Open Link ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ☑ Save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[EXTERNAL LINK]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[SAVE TO VAULT]", callback_data=f"save:{clean_u}")
         ],
         [
-            InlineKeyboardButton(text="[ ϟ Next Scan ]", callback_data=f"len:{length}")
+            InlineKeyboardButton(text="[RE-SCAN SAME]", callback_data=f"len:{length}")
         ],
-        [InlineKeyboardButton(text="[ ↶ Main Menu ]", callback_data="menu:main")]
+        [InlineKeyboardButton(text="« ROOT MENU", callback_data="nx:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -422,9 +417,9 @@ async def save_username_callback(callback: CallbackQuery):
     
     if uname not in profile["saved"]:
         profile["saved"].append(uname)
-        await callback.answer(f"Successfully saved: {uname}", show_alert=True)
+        await callback.answer(f"VAULT UPDATED: {uname}", show_alert=True)
     else:
-        await callback.answer("Already in your saved list!", show_alert=True)
+        await callback.answer("TARGET ALREADY STORED.", show_alert=True)
 
 @dp.message(BotStates.prefix_search)
 async def process_prefix_search(message: Message, state: FSMContext):
@@ -437,14 +432,14 @@ async def process_prefix_search(message: Message, state: FSMContext):
         target_len = 32
         
     profile = get_user_profile(user_id)
-    msg = await message.answer("┌ [ ⌯ ] searching with prefix...", parse_mode="HTML")
+    msg = await message.answer(f"[#] COMPILING PREFIX ANCHOR: {prefix}...", parse_mode="HTML")
     results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, target_length=target_len, use_digits=True, digits_count=1, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ ☒ ERROR ]\n└ nothing found with this prefix."
+        err_text = "=== ERROR ===\n[!] ANCHOR RESOLUTION FAILED."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
         
@@ -454,10 +449,10 @@ async def process_prefix_search(message: Message, state: FSMContext):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ⎋ Open Link ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ☑ Save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[EXTERNAL LINK]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[SAVE TO VAULT]", callback_data=f"save:{clean_u}")
         ],
-        [InlineKeyboardButton(text="[ ↶ Main Menu ]", callback_data="menu:main")]
+        [InlineKeyboardButton(text="« ROOT MENU", callback_data="nx:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -469,7 +464,7 @@ async def process_smart_variations(message: Message, state: FSMContext):
     await state.clear()
     
     profile = get_user_profile(user_id)
-    msg = await message.answer("┌ [ ⌬ ] analyzing smart variations...", parse_mode="HTML")
+    msg = await message.answer(f"[#] MUTATING SEED: {base}...", parse_mode="HTML")
     
     raw_variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
     variations = []
@@ -491,7 +486,7 @@ async def process_smart_variations(message: Message, state: FSMContext):
     add_to_history(user_id, free_found)
             
     if not free_found:
-        err_text = "┌─[ ☒ ERROR ]\n└ no free variations for this name."
+        err_text = "=== ERROR ===\n[!] NO MUTATIONS AVAILABLE."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
         
@@ -501,10 +496,10 @@ async def process_smart_variations(message: Message, state: FSMContext):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ⎋ Open Link ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ☑ Save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[EXTERNAL LINK]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[SAVE TO VAULT]", callback_data=f"save:{clean_u}")
         ],
-        [InlineKeyboardButton(text="[ ↶ Main Menu ]", callback_data="menu:main")]
+        [InlineKeyboardButton(text="« ROOT MENU", callback_data="nx:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -515,3 +510,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+                    
