@@ -170,13 +170,26 @@ LANGS = {
         "btn_auto": "⚡ Auto Search",
         "btn_saved": "☆ Saved Tags",
         "btn_history": "⏱ History",
-        "btn_updates": "✨ Updates №05 (Pro)",
+        "btn_updates": "✨ Updates №05",
+        "btn_rules": "📜 Rules & Bans",
         "btn_lang": "🌐 Language: EN / UA",
         "btn_help": "🛡 Help & Info",
         "back": "‹ Back",
         "main_menu": "⌂ Main Menu",
         "auto_title": "⚡ <b>Auto Search</b>\n\nChoose the desired username length (5 to 11 characters):",
         "help_text": "🛡 <b>Help & Instructions</b>\n\n1. Use <b>Auto Search</b> to find available usernames instantly.\n2. Save your favorite tags using the star button.",
+        "rules_text": (
+            "🛡 <b>Bot Rules & Ban Terms</b>\n\n"
+            "To ensure a comfortable and stable service for everyone, please follow these guidelines. Violations may result in temporary or permanent suspension.\n\n"
+            "❌ <b>What can get you banned:</b>\n"
+            "1. <b>Spam & Flooding:</b> Artificially overloading the bot with automated requests/scripts.\n"
+            "2. <b>Abuse:</b> Insulting administration, threats, or offensive language in feedback/support.\n"
+            "3. <b>Fraud:</b> Using found usernames for malicious purposes (extortion, blackmail, selling tags).\n\n"
+            "⏱ <b>Suspension Terms:</b>\n"
+            "• <b>Warning / 1 Day:</b> Minor first-time offenses.\n"
+            "• <b>7 – 30 Days:</b> Repeated violations or annoying spam.\n"
+            "• <b>Forever:</b> Bot hacking attempts, severe DDoS, or fraud."
+        ),
         "updates_text": "✨ <b>Updates №05 (Pro Database Edition)</b>\n\n• Integrated SQLite database.\n• Advanced Admin panel with analytics & bans.",
         "len_prompt": "⚡ <b>Auto Search</b>\n\nSelected length: <code>{length}</code> chars.\nDo you want to include digits?",
         "digits_yes": "☑ With Digits",
@@ -202,13 +215,26 @@ LANGS = {
         "btn_auto": "⚡ Автоматичний пошук",
         "btn_saved": "☆ Збережені теги",
         "btn_history": "⏱ Історія",
-        "btn_updates": "✨ Оновлення №05 (Pro)",
+        "btn_updates": "✨ Оновлення №05",
+        "btn_rules": "📜 Правила та бани",
         "btn_lang": "🌐 Мова: UA / EN",
         "btn_help": "🛡 Довідка",
         "back": "‹ Назад",
         "main_menu": "⌂ Головне меню",
         "auto_title": "⚡ <b>Автоматичний пошук</b>\n\nОберіть бажану довжину нікнейма (від 5 до 11 символів):",
         "help_text": "🛡 <b>Довідка та інструкція</b>\n\n1. Використовуйте <b>Автопошук</b> для швидкого знаходження вільних імен.\n2. Зберігайте улюблені варіанти.",
+        "rules_text": (
+            "🛡 <b>Правила та терміни блокування</b>\n\n"
+            "Для забезпечення комфортної та стабільної роботи сервісу дотримуйтесь простих правил. Порушення тягне за собою бан.\n\n"
+            "❌ <b>За що можна отримати бан:</b>\n"
+            "1. <b>Спам і навантаження:</b> Штучне перевантаження бота масовими автоматизованими запитами.\n"
+            "2. <b>Образи:</b> Образи адміністрації, погрози чи нецензурна лексика у підтримці.\n"
+            "3. <b>Шахрайство:</b> Використання знайдених тегів у деструктивних цілях (вимагання грошей, шантаж).\n\n"
+            "⏱ <b>Терміни блокування:</b>\n"
+            "• <b>Попередження / 1 день:</b> За дрібні первинні порушення.\n"
+            "• <b>7 – 30 днів:</b> За повторний спам чи неадекватну поведінку.\n"
+            "• <b>Назавжди:</b> За спроби зламати бота, DDoS або шахрайство."
+        ),
         "updates_text": "✨ <b>Оновлення №05 (Pro Database Edition)</b>\n\n• Інтегровано повноцінну SQLite базу даних.\n• Потужна адмін-панель з розсилками, банами та аналітикою.",
         "len_prompt": "⚡ <b>Автоматичний пошук</b>\n\nОбрана довжина: <code>{length}</code> симв.\nЧи використовувати цифри у назві?",
         "digits_yes": "☑ З цифрами",
@@ -249,7 +275,10 @@ def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=t(user_id, "btn_saved"), callback_data="nav:view_saved"),
             InlineKeyboardButton(text=t(user_id, "btn_history"), callback_data="nav:view_history"),
         ],
-        [InlineKeyboardButton(text=t(user_id, "btn_updates"), callback_data="nav:updates")],
+        [
+            InlineKeyboardButton(text=t(user_id, "btn_updates"), callback_data="nav:updates"),
+            InlineKeyboardButton(text=t(user_id, "btn_rules"), callback_data="nav:rules"),
+        ],
         [
             InlineKeyboardButton(text=t(user_id, "btn_lang"), callback_data="nav:toggle_lang"),
             InlineKeyboardButton(text=t(user_id, "btn_help"), callback_data="nav:help"),
@@ -367,7 +396,7 @@ async def send_main_menu(message_or_callback, user_id: int, edit: bool = True):
     else:
         await message_or_callback.answer(text, reply_markup=markup, parse_mode="HTML")
 
-# --- СТАРТ ТА ПЕРЕВІРКА БАНУ БЕЗ ПОМИЛКОВОГО MIDDLEWARE ---
+# --- СТАРТ ТА ПЕРЕВІРКА БАНУ ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -435,21 +464,6 @@ async def cmd_ban(message: Message):
         return
     try:
         target_id = int(args[1])
-        days = int(args[2])
-        reason = args[3] if len(args) > 3 else "Порушення правил"
-        ban_user(target_id, reason, days)
-        await message.answer(f"✅ Користувача `{target_id}` заблоковано.", parse_mode="Markdown")
-    except Exception as e:
-        await message.answer(f"Помилка: {e}")
-
-@dp.message(Command("unban"))
-async def cmd_unban(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    args = message.text.split()
-    if len(args) < 2:
-        return
-    target_id = int(args[1])
     unban_user(target_id)
     await message.answer(f"✅ Користувача `{target_id}` розблоковано.")
 
@@ -504,6 +518,8 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         return
     elif action == "updates":
         await callback.message.edit_text(t(user_id, "updates_text"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
+    elif action == "rules":
+        await callback.message.edit_text(t(user_id, "rules_text"), reply_markup=back_keyboard(user_id), parse_mode="HTML")
     elif action == "view_saved":
         conn = sqlite3.connect("bot_database.db")
         cursor = conn.cursor()
@@ -617,7 +633,7 @@ async def main():
     cleanup_old_data()
     asyncio.create_task(background_cleanup_loop())
     await bot.delete_webhook(drop_pending_updates=True)
-    logging.info("Pro Bot with cleaned handlers is starting...")
+    logging.info("Pro Bot with Rules menu is starting...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
