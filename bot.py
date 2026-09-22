@@ -464,6 +464,19 @@ async def cmd_ban(message: Message):
         return
     try:
         target_id = int(args[1])
+        days = int(args[2])
+        reason = args[3] if len(args) > 3 else "Порушення правил"
+        ban_user(target_id, reason, days)
+        await message.answer(f"Помилка: {e}")
+
+@dp.message(Command("unban"))
+async def cmd_unban(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    args = message.text.split()
+    if len(args) < 2:
+        return
+    target_id = int(args[1])
     unban_user(target_id)
     await message.answer(f"✅ Користувача `{target_id}` розблоковано.")
 
@@ -633,7 +646,7 @@ async def main():
     cleanup_old_data()
     asyncio.create_task(background_cleanup_loop())
     await bot.delete_webhook(drop_pending_updates=True)
-    logging.info("Pro Bot with Rules menu is starting...")
+    logging.info("Pro Bot is starting...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
