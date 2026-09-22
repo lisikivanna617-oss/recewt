@@ -30,7 +30,7 @@ bot = Bot(token=BOT_TOKEN if BOT_TOKEN else "DUMMY_TOKEN")
 dp = Dispatcher()
 
 # Впиши сюди свій числовий ID в Telegram для доступу до адмін-панелі
-ADMIN_ID = YOUR_TELEGRAM_ID  # 5619415334
+ADMIN_ID = 5619415334
 
 USERNAME_PATTERN = re.compile(f"^[A-Za-z][A-Za-z0-9_]{{4,31}}$")
 
