@@ -57,15 +57,15 @@ class BotStates(StatesGroup):
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="⚡ Auto-Search", callback_data="menu:auto"),
-            InlineKeyboardButton(text="⚙️ Prefix / Suffix", callback_data="menu:prefix"),
+            InlineKeyboardButton(text="↻ Auto-Search", callback_data="menu:auto"),
+            InlineKeyboardButton(text="⎋ Prefix / Suffix", callback_data="menu:prefix"),
         ],
         [
             InlineKeyboardButton(text="💡 Smart Variations", callback_data="menu:smart"),
             InlineKeyboardButton(text="📁 Profile & Saved", callback_data="menu:profile"),
         ],
         [
-            InlineKeyboardButton(text="ℹ️ Help", callback_data="menu:help"),
+            InlineKeyboardButton(text="ⓘ Help", callback_data="menu:help"),
         ]
     ])
 
@@ -97,7 +97,7 @@ def digits_choice_keyboard(length: int) -> InlineKeyboardMarkup:
 def digits_count_keyboard(length: int) -> InlineKeyboardMarkup:
     buttons = []
     row = []
-    max_d = min(3, length - 1) # Максимум цифр не може перевищувати довжину мінус 1 (щоб залишилась хоча б 1 літера на початку)
+    max_d = min(3, length - 1)
     for d in range(1, max_d + 1):
         row.append(InlineKeyboardButton(text=f"[{d} digit(s)]", callback_data=f"dcount:{length}:{d}"))
     if row:
@@ -137,10 +137,10 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
     max_attempts = 100
     
     steps = [
-        ("┌ [ ⋯ ] initializing search... 25%", 25),
-        ("├ [ ≡ ] scanning databases... 50%", 50),
-        ("├ [ ⟳ ] checking statuses... 75%", 75),
-        ("└ [ ✓ ] finalizing... 95%", 95),
+        ("┌ [ ⌬ ] connecting to t.me gateway...", 20),
+        ("├ [ ⌕ ] bypassing filters & scanning...", 50),
+        ("├ [ ↻ ] cross-checking availability...", 80),
+        ("└ [ ✓ ] target acquired!", 100),
     ]
 
     step_index = 0
@@ -173,12 +173,9 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
                     rand_part = "".join(random.choice(pool) for _ in range(rand_len))
                     candidate = f"{prefix}{rand_part}{suffix}"
             else:
-                # Суворий генератор точної довжини з урахуванням наявності чи відсутності цифр
                 first_char = random.choice(letters)
-                
                 if use_digits and digits_count > 0:
                     rest_len = target_length - 1
-                    # Вибираємо позиції для цифр у середині/кінці
                     chosen_digits_count = min(digits_count, rest_len)
                     chosen_letters_count = rest_len - chosen_digits_count
                     
@@ -195,17 +192,15 @@ async def generate_and_find_free(message_to_edit, prefix: str = "", suffix: str 
 
             if len(candidate) != target_length:
                 continue
-
             if not USERNAME_PATTERN.match(candidate):
                 continue
-
             if f"@{candidate}" in free_found:
                 continue
                 
             if await check_single_username(session, candidate):
                 free_found.append(f"@{candidate}")
                 
-            await asyncio.sleep(0.03)
+            await asyncio.sleep(0.02)
             
     return free_found
 
@@ -218,7 +213,7 @@ def format_result_card(username: str) -> str:
         readability = max(4, readability - 2)
         
     if length <= 5:
-        price = "$25 - $60"
+        price = "$15 - $30"
     elif length == 6:
         price = "$10 - $25"
     else:
@@ -227,22 +222,28 @@ def format_result_card(username: str) -> str:
     liquidity = max(4, min(9, readability - 1))
     
     return (
-        f"┌─[ status: found ]\n"
+        f"┌─[ ☑ STATUS: AVAILABLE ]\n"
         f"│\n"
-        f"├ target: <code>{username}</code>\n"
+        f"├ target: <code>{username}</code> (tap to copy)\n"
         f"├ length: {length} chars\n"
         f"├ readability: {readability}/10\n"
-        f"├ approximate price: {price}\n"
+        f"├ est. value: {price}\n"
         f"├ liquidity: {liquidity}/10\n"
-        f"└ status: [ free ]\n\n"
-        f"◇ @thetagtrackbot"
+        f"└ status: [ • FREE ]\n\n"
+        f"◇ Powered by @tagtrack_core_bot"
     )
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     name = html.escape(message.from_user.first_name)
-    text = f"┌─[ tag track system ]\n│\n├ welcome, {name}!\n└ choose an action below:"
+    text = (
+        f"┌─[ ⌬ TAG TRACK SYSTEM v2.0 ]\n"
+        f"│\n"
+        f"├ welcome back, {name}!\n"
+        f"├ status: [ 🟢 ONLINE ]\n"
+        f"└ select an option below:"
+    )
     await message.answer(text, reply_markup=main_keyboard(), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("menu:"))
@@ -254,22 +255,28 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
     
     if action == "main":
         name = html.escape(callback.from_user.first_name)
-        text = f"┌─[ tag track system ]\n│\n├ welcome, {name}!\n└ choose an action below:"
+        text = (
+            f"┌─[ ϟ TAG TRACK SYSTEM v2.0 ]\n"
+            f"│\n"
+            f"├ welcome back, {name}!\n"
+            f"├ status: [ 🟢 ONLINE ]\n"
+            f"└ select an option below:"
+        )
         await callback.message.edit_text(text, reply_markup=main_keyboard(), parse_mode="HTML")
         
     elif action == "auto":
         await state.set_state(BotStates.auto_search)
-        text = "┌─[ auto-search ]\n└ select exact length (5-11):"
+        text = "┌─[ ϟ AUTO-SEARCH MODULE ]\n└ select exact length (5-11):"
         await callback.message.edit_text(text, reply_markup=length_keyboard(), parse_mode="HTML")
         
     elif action == "prefix":
         await state.set_state(BotStates.prefix_search)
-        text = "┌─[ prefix / suffix ]\n└ enter text or prefix:"
+        text = "┌─[ ⎋ PREFIX / SUFFIX MODULE ]\n└ enter custom prefix:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "smart":
         await state.set_state(BotStates.smart_variations)
-        text = "┌─[ smart variations ]\n└ enter base name:"
+        text = "┌─[ 💡 SMART VARIATIONS ]\n└ enter base name:"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "profile":
@@ -277,42 +284,49 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
         history_count = len(profile["history"])
         
         text = (
-            f"┌─[ user profile ]\n"
+            f"┌─[ 📁 USER DASHBOARD ]\n"
             f"│\n"
             f"├ id: <code>{user_id}</code>\n"
-            f"├ checks: {profile['checks_count']}\n"
-            f"├ saved: {saved_count}\n"
-            f"└ history: {history_count}"
+            f"├ total checks: {profile['checks_count']}\n"
+            f"├ saved tags: {saved_count}\n"
+            f"└ history items: {history_count}"
         )
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="[ saved ]", callback_data="menu:view_saved"),
-                InlineKeyboardButton(text="[ history ]", callback_data="menu:view_history")
+                InlineKeyboardButton(text="[ 📂 Saved ]", callback_data="menu:view_saved"),
+                InlineKeyboardButton(text="[ 📜 History ]", callback_data="menu:view_history")
             ],
-            [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+            [InlineKeyboardButton(text="‹ Back", callback_data="menu:main")]
         ])
         await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         
     elif action == "view_saved":
         saved = profile["saved"]
         if not saved:
-            text = "┌─[ saved ]\n└ empty."
+            text = "┌─[ 📂 SAVED TAGS ]\n└ folder is empty."
         else:
             items = [f"├ <code>{u}</code>" for u in saved]
-            text = "┌─[ saved tags ]\n│\n" + "\n".join(items) + "\n└ —"
+            text = "┌─[ 📂 SAVED TAGS ]\n│\n" + "\n".join(items) + "\n└ —"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "view_history":
         history = profile["history"]
         if not history:
-            text = "┌─[ history ]\n└ empty."
+            text = "┌─[ 📜 HISTORY ]\n└ no recent checks."
         else:
             items = [f"├ <code>{u}</code>" for u in history[:10]]
-            text = "┌─[ recent history ]\n│\n" + "\n".join(items) + "\n└ —"
+            text = "┌─[ 📜 RECENT HISTORY ]\n│\n" + "\n".join(items) + "\n└ —"
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     elif action == "help":
-        text = "┌─[ help ]\n└ select length, choose if digits are needed, and find free tags."
+        text = (
+            f"┌─[ ⓘ SYSTEM GUIDE ]\n"
+            f"│\n"
+            f"├ select length or prefix\n"
+            f"├ click tags to copy instantly\n"
+            f"└ save cool finds to your profile\n"
+            f"└ —"
+        )
         await callback.message.edit_text(text, reply_markup=back_keyboard(), parse_mode="HTML")
         
     await callback.answer()
@@ -320,7 +334,7 @@ async def menu_callbacks(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("len:"))
 async def length_selected_callback(callback: CallbackQuery):
     length = int(callback.data.split(":")[1])
-    text = f"┌─[ auto-search ]\n├ length: {length} chars\n└ use digits (0-9)?"
+    text = f"┌─[ ⚡ AUTO-SEARCH ]\n├ length: {length} chars\n└ include digits (0-9)?"
     await callback.message.edit_text(text, reply_markup=digits_choice_keyboard(length), parse_mode="HTML")
 
 @dp.callback_query(F.data.startswith("digits:"))
@@ -332,19 +346,17 @@ async def digits_choice_callback(callback: CallbackQuery):
     profile = get_user_profile(user_id)
     
     if choice == "yes":
-        # Переходимо до вибору кількості цифр (від 1 до 3)
-        text = f"┌─[ auto-search ]\n├ length: {length} chars\n└ select number of digits (1-3):"
+        text = f"┌─[ ↻ AUTO-SEARCH ]\n├ length: {length} chars\n└ select digits count (1-3):"
         await callback.message.edit_text(text, reply_markup=digits_count_keyboard(length), parse_mode="HTML")
     else:
-        # Без цифр — одразу запускаємо пошук
-        msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag (no digits)...", parse_mode="HTML")
+        msg = await callback.message.edit_text(f"┌ [ ⌬ ] scanning {length}-char tag (no digits)...", parse_mode="HTML")
         results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=False, count=1)
         
         profile["checks_count"] += 1
         add_to_history(user_id, results)
         
         if not results:
-            err_text = "┌─[ error ]\n└ no free tags found for this length, try again."
+            err_text = "┌─[ ❌ ERROR ]\n└ no free tags found, try again."
             await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
             return
 
@@ -354,10 +366,13 @@ async def digits_choice_callback(callback: CallbackQuery):
         
         buttons = [
             [
-                InlineKeyboardButton(text="[ ↗ open ]", url=f"https://t.me/{clean_u}"),
-                InlineKeyboardButton(text="[ ★ save ]", callback_data=f"save:{clean_u}")
+                InlineKeyboardButton(text="[ ↗ Open Link ]", url=f"https://t.me/{clean_u}"),
+                InlineKeyboardButton(text="[ ★ Save Tag ]", callback_data=f"save:{clean_u}")
             ],
-            [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+            [
+                InlineKeyboardButton(text="[ ↻ Generate Another ]", callback_data=f"len:{length}")
+            ],
+            [InlineKeyboardButton(text="‹ Main Menu", callback_data="menu:main")]
         ]
         
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -370,14 +385,14 @@ async def digits_count_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     profile = get_user_profile(user_id)
     
-    msg = await callback.message.edit_text(f"┌ [ ⋯ ] searching for {length}-char tag with {d_count} digit(s)...", parse_mode="HTML")
+    msg = await callback.message.edit_text(f"┌ [ ϟ ] scanning {length}-char tag with {d_count} digit(s)...", parse_mode="HTML")
     results = await generate_and_find_free(message_to_edit=msg, target_length=length, use_digits=True, digits_count=d_count, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ error ]\n└ no free tags found with these parameters, try again."
+        err_text = "┌─[ ❌ ERROR ]\n└ no free tags found with these parameters."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
 
@@ -387,10 +402,13 @@ async def digits_count_callback(callback: CallbackQuery):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ↗ open ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ★ save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[ ↗ Open Link ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ Save Tag ]", callback_data=f"save:{clean_u}")
         ],
-        [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+        [
+            InlineKeyboardButton(text="[ 🔄 Generate Another ]", callback_data=f"len:{length}")
+        ],
+        [InlineKeyboardButton(text="‹ Main Menu", callback_data="menu:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -404,9 +422,9 @@ async def save_username_callback(callback: CallbackQuery):
     
     if uname not in profile["saved"]:
         profile["saved"].append(uname)
-        await callback.answer(f"saved: {uname}", show_alert=True)
+        await callback.answer(f"Successfully saved: {uname}", show_alert=True)
     else:
-        await callback.answer("already saved", show_alert=True)
+        await callback.answer("Already in your saved list!", show_alert=True)
 
 @dp.message(BotStates.prefix_search)
 async def process_prefix_search(message: Message, state: FSMContext):
@@ -419,14 +437,14 @@ async def process_prefix_search(message: Message, state: FSMContext):
         target_len = 32
         
     profile = get_user_profile(user_id)
-    msg = await message.answer("┌ [ ⋯ ] searching with prefix...", parse_mode="HTML")
+    msg = await message.answer("┌ [ ϟ ] searching with prefix...", parse_mode="HTML")
     results = await generate_and_find_free(message_to_edit=msg, prefix=prefix, target_length=target_len, use_digits=True, digits_count=1, count=1)
     
     profile["checks_count"] += 1
     add_to_history(user_id, results)
     
     if not results:
-        err_text = "┌─[ error ]\n└ nothing found with this prefix."
+        err_text = "┌─[ ❌ ERROR ]\n└ nothing found with this prefix."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
         
@@ -436,10 +454,10 @@ async def process_prefix_search(message: Message, state: FSMContext):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ↗ open ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ★ save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[ ↗ Open Link ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ Save Tag ]", callback_data=f"save:{clean_u}")
         ],
-        [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+        [InlineKeyboardButton(text="‹ Main Menu", callback_data="menu:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
@@ -451,7 +469,7 @@ async def process_smart_variations(message: Message, state: FSMContext):
     await state.clear()
     
     profile = get_user_profile(user_id)
-    msg = await message.answer("┌ [ ⋯ ] analyzing variations...", parse_mode="HTML")
+    msg = await message.answer("┌ [ ϟ ] analyzing smart variations...", parse_mode="HTML")
     
     raw_variations = [f"the_{base}", f"{base}x", f"real_{base}", f"{base}hq", f"{base}_dev", f"{base}_tg", f"{base}_1", f"01_{base}"]
     variations = []
@@ -473,7 +491,7 @@ async def process_smart_variations(message: Message, state: FSMContext):
     add_to_history(user_id, free_found)
             
     if not free_found:
-        err_text = "┌─[ error ]\n└ no free variations for this name."
+        err_text = "┌─[ ❌ ERROR ]\n└ no free variations for this name."
         await msg.edit_text(err_text, reply_markup=main_keyboard(), parse_mode="HTML")
         return
         
@@ -483,18 +501,14 @@ async def process_smart_variations(message: Message, state: FSMContext):
     
     buttons = [
         [
-            InlineKeyboardButton(text="[ ↗ open ]", url=f"https://t.me/{clean_u}"),
-            InlineKeyboardButton(text="[ ★ save ]", callback_data=f"save:{clean_u}")
+            InlineKeyboardButton(text="[ ↗ Open Link ]", url=f"https://t.me/{clean_u}"),
+            InlineKeyboardButton(text="[ ★ Save Tag ]", callback_data=f"save:{clean_u}")
         ],
-        [InlineKeyboardButton(text="‹ back", callback_data="menu:main")]
+        [InlineKeyboardButton(text="‹ Main Menu", callback_data="menu:main")]
     ]
     
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML", disable_web_page_preview=True)
 
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-    
+    await dp.s
