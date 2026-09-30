@@ -10,8 +10,8 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# 👇 Впиши сюди свій власний Telegram ID для тестування команд
-TEST_ADMIN_ID = 123456789  # Заміни на свій ID
+# 👇 Впиши сюди свій власний Telegram ID для тестування команд через /addref
+TEST_ADMIN_ID = 5619415334  # Заміни на свій ID
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -66,13 +66,14 @@ def update_referral_progress(referrer_id: int):
         days_to_add = 0
         reset_scale = False
         
+        # Фіксовані нагороди без сумування
         if ref_count == 2:
             days_to_add = 1
         elif ref_count == 3:
             days_to_add = 3
         elif ref_count >= 5:
             days_to_add = 7
-            reset_scale = True 
+            reset_scale = True # Обнуляємо шкалу після досягнення 5 рефералів
             
         new_prem = current_prem + datetime.timedelta(days=days_to_add) if days_to_add > 0 else current_prem
         new_ref_count = 0 if reset_scale else ref_count
@@ -128,7 +129,7 @@ async def cmd_start(message: Message):
 
     welcome_text = (
         "✦ ─────────── ⚡ ─────────── ✦\n"
-        "         🤖 **TAGTRACK BOT**         \n"
+        "         🤖 **TAGPULSE BOT**         \n"
         "✦ ─────────── ⚡ ─────────── ✦\n\n"
         "✨ *Your professional username tracker & monitor.*\n\n"
         "👇 *Choose an option below:*"
@@ -208,7 +209,7 @@ async def show_monitor_menu(callback: CallbackQuery):
 async def back_to_main(callback: CallbackQuery):
     welcome_text = (
         "✦ ─────────── ⚡ ─────────── ✦\n"
-        "         🤖 **TAGTRACK BOT**         \n"
+        "         🤖 **TAGPULSE BOT**         \n"
         "✦ ─────────── ⚡ ─────────── ✦\n\n"
         "✨ *Your professional username tracker & monitor.*\n\n"
         "👇 *Choose an option below:*"
@@ -219,7 +220,7 @@ async def back_to_main(callback: CallbackQuery):
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagTrack Bot is online with clean session shutdown!")
+    print("TagPulse Bot is online!")
     try:
         await dp.start_polling(bot)
     finally:
@@ -229,4 +230,3 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
-    
