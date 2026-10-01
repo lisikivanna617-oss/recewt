@@ -10,13 +10,13 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# 👇 Впиши сюди свій власний Telegram ID для тестування команд через /addref
-TEST_ADMIN_ID = 5619415334  # Заміни на свій ID
+# 👇 Enter your Telegram ID here for testing via /addref
+TEST_ADMIN_ID = 5619415334  # Replace with your ID
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- БАЗА ДАНИХ (SQLite) ---
+# --- DATABASE (SQLite) ---
 def init_db():
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
@@ -66,14 +66,13 @@ def update_referral_progress(referrer_id: int):
         days_to_add = 0
         reset_scale = False
         
-        # Фіксовані нагороди без сумування
         if ref_count == 2:
             days_to_add = 1
         elif ref_count == 3:
             days_to_add = 3
         elif ref_count >= 5:
             days_to_add = 7
-            reset_scale = True # Обнуляємо шкалу після досягнення 5 рефералів
+            reset_scale = True 
             
         new_prem = current_prem + datetime.timedelta(days=days_to_add) if days_to_add > 0 else current_prem
         new_ref_count = 0 if reset_scale else ref_count
@@ -89,24 +88,25 @@ def update_referral_progress(referrer_id: int):
             asyncio.create_task(
                 bot.send_message(
                     referrer_id, 
-                    f"🎉 **Вітаємо!** Ви досягли цілі реферальної програми та отримали **{days_to_add} дн(ів) Premium-статусу!** 🚀"
+                    f"⚡ Premium unlocked: <b>+{days_to_add} days</b>",
+                    parse_mode="HTML"
                 )
             )
     conn.close()
 
-# --- КЛАВІАТУРА ---
+# --- MINIMALIST KEYBOARDS ---
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Premium & Referrals", callback_data="menu_premium")],
-        [InlineKeyboardButton(text="🔍 Check Username / Monitor", callback_data="menu_monitor")]
+        [InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium"),
+         InlineKeyboardButton(text="🔍 Monitor", callback_data="menu_monitor")]
     ])
 
 def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Back to Menu", callback_data="menu_back")]
+        [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
 
-# --- ХЕНДЛЕРИ ---
+# --- HANDLERS ---
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     user_id = message.from_user.id
@@ -127,19 +127,16 @@ async def cmd_start(message: Message):
         if referrer_id:
             update_referral_progress(referrer_id)
 
-    welcome_text = (
-        "✦ ─────────── ⚡ ─────────── ✦\n"
-        "         🤖 **TAGPULSE BOT**         \n"
-        "✦ ─────────── ⚡ ─────────── ✦\n\n"
-        "✨ *Your professional username tracker & monitor.*\n\n"
-        "👇 *Choose an option below:*"
+    text = (
+        "<b>TagTrack</b>\n"
+        "<i>Username monitoring & analytics.</i>\n\n"
+        "Select an option below:"
     )
-    await message.answer(welcome_text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
 
 @dp.message(Command("addref"))
 async def test_add_referral(message: Message):
     if message.from_user.id != TEST_ADMIN_ID:
-        await message.answer("❌ У вас немає прав для використання цієї тестової команди.")
         return
     
     if not get_user(message.from_user.id):
@@ -149,9 +146,9 @@ async def test_add_referral(message: Message):
     user_data = get_user(message.from_user.id)
     
     await message.answer(
-        f"🧪 **[ТЕСТ]** Реферала успішно додано!\n"
-        f"📊 Поточна шкала: `{user_data[2]}/5`\n"
-        f"🌐 Загалом запрошено: `{user_data[3]}`"
+        f"[TEST] Referral added.\n"
+        f"Scale: <code>{user_data[2]}/5</code> | Total: <code>{user_data[3]}</code>",
+        parse_mode="HTML"
     )
 
 @dp.callback_query(F.data == "menu_premium")
@@ -163,64 +160,55 @@ async def show_premium_info(callback: CallbackQuery):
     total_invited = user_data[3] if user_data else 0
     prem_until_str = user_data[4] if user_data else None
     
-    is_premium = False
-    prem_status_text = "❌ Inactive"
+    prem_status = "Inactive"
     if prem_until_str:
         prem_date = datetime.datetime.fromisoformat(prem_until_str)
         if prem_date > datetime.datetime.now():
-            is_premium = True
-            prem_status_text = f"✅ Active until {prem_date.strftime('%d.%m.%Y %H:%M')}"
+            prem_status = f"Active until {prem_date.strftime('%d.%m %H:%M')}"
 
     bot_info = await bot.get_me()
     ref_link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
 
     text = (
-        "✦ ─────────── 💎 ─────────── ✦\n"
-        "         **PREMIUM & REFERRALS**         \n"
-        "✦ ─────────── ⚡ ─────────── ✦\n\n"
-        f"📊 **Status:** {prem_status_text}\n"
-        f"👥 **Current scale progress:** `{ref_count}/5`\n"
-        f"🌐 **Total invited friends:** `{total_invited}`\n\n"
-        "🎁 **Fixed Reward Tiers (Non-cumulative):**\n"
-        " • 2 referrals ➔ ➕ **1 day** Premium\n"
-        " • 3 referrals ➔ ➕ **3 days** Premium\n"
-        " • 5 referrals ➔ ➕ **7 days** Premium *(Scale resets)*\n\n"
-        "🔗 **Your Referral Link:**\n"
-        f"`{ref_link}`\n\n"
-        "💡 *Rewards are fixed per tier and do not stack with previous steps!*"
+        "<b>[ Premium & Referrals ]</b>\n\n"
+        f"Status: <b>{prem_status}</b>\n"
+        f"Scale: <code>{ref_count}/5</code>\n"
+        f"Invited friends: <code>{total_invited}</code>\n\n"
+        "<b>Rewards:</b>\n"
+        "• 2 referrals → +1 day\n"
+        "• 3 referrals → +3 days\n"
+        "• 5 referrals → +7 days (scale resets)\n\n"
+        "<b>Your referral link:</b>\n"
+        f"<code>{ref_link}</code>"
     )
     
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_monitor")
 async def show_monitor_menu(callback: CallbackQuery):
     text = (
-        "✦ ─────────── 🔍 ─────────── ✦\n"
-        "         **USERNAME MONITOR**         \n"
-        "✦ ─────────── ⚡ ─────────── ✦\n\n"
-        "📝 *Send the username you want to track.* \n\n"
-        "⚠️ *Free users have 1 slot limit. Premium users get up to 5-10 slots and automatic instant tracking!*"
+        "<b>[ Username Monitor ]</b>\n\n"
+        "Send a username to check or start monitoring.\n\n"
+        "<i>Free: 1 slot | Premium: 5–10 slots + auto alerts</i>"
     )
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_back")
 async def back_to_main(callback: CallbackQuery):
-    welcome_text = (
-        "✦ ─────────── ⚡ ─────────── ✦\n"
-        "         🤖 **TAGPULSE BOT**         \n"
-        "✦ ─────────── ⚡ ─────────── ✦\n\n"
-        "✨ *Your professional username tracker & monitor.*\n\n"
-        "👇 *Choose an option below:*"
+    text = (
+        "<b>TagTrack</b>\n"
+        "<i>Username monitoring & analytics.</i>\n\n"
+        "Select an option below:"
     )
-    await callback.message.edit_text(welcome_text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse Bot is online!")
+    print("TagTrack Minimalist Bot is online!")
     try:
         await dp.start_polling(bot)
     finally:
@@ -230,3 +218,4 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
+        
