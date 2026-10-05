@@ -480,8 +480,13 @@ async def main():
         await dp.start_polling(bot)
     finally:
         await bot.session.close()
-
 if __name__ == "__main__":
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.set_event_loop_policy(
+            asyncio.WindowsSelectorEventLoopPolicy()
+        )
+    
+    # --- ДОДАЙТЕ ОЦЕЙ РЯДОК ---
+    threading.Thread(target=run_web, daemon=True).start()
+    
     asyncio.run(main())
