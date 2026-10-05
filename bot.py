@@ -46,7 +46,6 @@ def init_db():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
     
-    # Table for bought usernames
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bought_usernames (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +55,6 @@ def init_db():
         )
     """)
     
-    # Table for user stats / premium status
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -70,7 +68,6 @@ def init_db():
 
 # --- Username Search Logic ---
 def search_users(user_id, count=5):
-    # Fetch already purchased usernames from the database
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
     cursor.execute("SELECT username FROM bought_usernames")
@@ -81,27 +78,40 @@ def search_users(user_id, count=5):
     chars = string.ascii_lowercase + string.digits
 
     while len(found) < count:
-        # Generate base text and trim 4 characters from the end
-        base = "".join(random.choices(chars, k=7))
-        trimmed_base = base[:-4]
-        candidate = f"{trimmed_base}_tag"
+        # Генерация юзернеймов случайной длины от 5 до 12 символов
+        length = random.randint(5, 12)
+        base = "".join(random.choices(chars, k=length))
+        candidate = base
 
-        # Check if the candidate is not bought and not already in the list
         if candidate.lower() not in bought and candidate not in found:
             found.append(candidate)
 
     return found
 
 # --- Keyboards ---
-def get_main_keyboard():
+def get_main_keyboard(user_id):
+    buttons = [
+        [InlineKeyboardButton(text="🔍 Search Tags", callback_data="search_tags")],
+        [InlineKeyboardButton(text="⭐ Premium", callback_data="premium_info")]
+    ]
+    # Добавляем кнопку админки только для владельца и тестера
+    if user_id in (OWNER_ID, TESTER_ID):
+        buttons.append([InlineKeyboardButton(text="🛠 Admin Panel", callback_data="admin_panel")])
+        
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_admin_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔍 Search Tags", callback_data="search_tags")],
-            [InlineKeyboardButton(text="⭐ Premium", callback_data="premium_info")]
+            [InlineKeyboardButton(text="📊 Stats", callback_data="admin_stats")],
+            [InlineKeyboardButton(text="📜 Bought Tags", callback_data="admin_bought_list")],
+            [InlineKeyboardButton(text="🧪 Test Add Bought Tag", callback_data="admin_test_add")],
+            [InlineKeyboardButton(text="🗑 Clear Database", callback_data="admin_clear_db")],
+            [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
         ]
     )
 
-def get_back_keyboard(user_id):
+def get_back_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
@@ -113,7 +123,7 @@ def get_back_keyboard(user_id):
 async def start_handler(message: Message):
     await message.answer(
         "<b>Welcome to TagPulse Bot!</b>\n\nChoose an option below:",
-        reply_markup=get_main_keyboard(),
+        reply_markup=get_main_keyboard(message.from_user.id),
         parse_mode="HTML"
     )
 
@@ -121,7 +131,7 @@ async def start_handler(message: Message):
 async def main_menu_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         "<b>Welcome to TagPulse Bot!</b>\n\nChoose an option below:",
-        reply_markup=get_main_keyboard(),
+        reply_markup=get_main_keyboard(callback.from_user.id),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -131,19 +141,104 @@ async def search_tags_handler(callback: CallbackQuery):
     tags = search_users(callback.from_user.id)
     tags_text = "\n".join([f"• <code>@{tag}</code>" for tag in tags])
     
-    text = f"<b>Generated Available Tags:</b>\n\n{tags_text}"
+    text = f"<b>Generated Available Tags (5-12 chars):</b>\n\n{tags_text}"
     await callback.message.edit_text(
         text,
-        reply_markup=get_back_keyboard(callback.from_user.id),
+        reply_markup=get_back_keyboard(),
         parse_mode="HTML"
     )
     await callback.answer()
+
+# --- Admin / Tester Handlers ---
+@dp.callback_query(F.data == "admin_panel")
+async def admin_panel_handler(callback: CallbackQuery):
+    if callback.from_user.id not in (OWNER_ID, TESTER_ID):
+        await callback.answer("Access denied!", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>🛠 Admin / Tester Panel</b>\n\nSelect a developer tool:",
+        reply_markup=get_admin_keyboard(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_stats")
+async def admin_stats_handler(callback: CallbackQuery):
+    if callback.from_user.id not in (OWNER_ID, TESTER_ID):
+        return
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM bought_usernames")
+    bought_count = cursor.fetchone()[0]
+    conn.close()
+
+    text = (
+        "<b>📊 System Statistics</b>\n\n"
+        f"• Total Purchased Tags: <code>{bought_count}</code>\n"
+        f"• Owner ID: <code>{OWNER_ID}</code>\n"
+        f"• Tester ID: <code>{TESTER_ID}</code>"
+    )
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Back to Admin", callback_data="admin_panel")]])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_bought_list")
+async def admin_bought_list_handler(callback: CallbackQuery):
+    if callback.from_user.id not in (OWNER_ID, TESTER_ID):
+        return
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM bought_usernames LIMIT 20")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        text = "<b>📜 Bought Tags:</b>\n\nNo purchased tags found."
+    else:
+        tags_list = "\n".join([f"• <code>@{r[0]}</code>" for r in rows])
+        text = f"<b>📜 Last Purchased Tags:</b>\n\n{tags_list}"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Back to Admin", callback_data="admin_panel")]])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_test_add")
+async def admin_test_add_handler(callback: CallbackQuery):
+    if callback.from_user.id not in (OWNER_ID, TESTER_ID):
+        return
+
+    test_tag = "test_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO bought_usernames (username, user_id) VALUES (?, ?)", (test_tag, callback.from_user.id))
+    conn.commit()
+    conn.close()
+
+    await callback.answer(f"Added test tag: @{test_tag}", show_alert=True)
+
+@dp.callback_query(F.data == "admin_clear_db")
+async def admin_clear_db_handler(callback: CallbackQuery):
+    if callback.from_user.id not in (OWNER_ID, TESTER_ID):
+        return
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bought_usernames")
+    conn.commit()
+    conn.close()
+
+    await callback.answer("Database cleared successfully!", show_alert=True)
 
 # --- Main Entry Point ---
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse Bot is online and updated!")[span_1](start_span)[span_1](end_span)
+    print("TagPulse Bot is online and updated!")
     
     try:
         await dp.start_polling(bot)
