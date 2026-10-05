@@ -112,13 +112,38 @@ async def check_telegram_username(username: str) -> bool:
     if len(username) < 5:
         return False
 
+    # 1. Перевірка через офіційний Telegram Bot API
     try:
         await bot.get_chat(f"@{username}")
+        # Якщо чат або юзера знайдено — тег точно ЗАЙНЯТИЙ
         return False
     except Exception as e:
         err_msg = str(e).lower()
-        if "chat not found" in err_msg or "user not found" in err_msg:
-            return True
+        # Якщо Telegram видав іншу помилку (наприклад, флуд-контроль) — пропускаємо
+        if "chat not found" not in err_msg and "user not found" not in err_msg:
+            return False
+
+    # 2. Додаткова перевірка через t.me (для виявлення зарезервованих юзерів, Fragment та забанених тегів)
+    try:
+        loop = asyncio.get_event_loop()
+        # Виконуємо HTTP-запит у фоновому потоці, щоб не блокувати бота
+        response = await loop.run_in_executor(
+            None, 
+            lambda: requests.get(f"https://t.me/{username}", timeout=3, headers={"User-Agent": "Mozilla/5.0"})
+        )
+        
+        if response.status_code == 200:
+            html = response.text
+            # Якщо на сторінці є згадка про опис, аватару, Telegram Web або Fragment — тег ЗАЙНЯТИЙ
+            if "tgme_page_title" in html or "tgme_page_extra" in html or "fragment.com" in html:
+                return False
+            # Якщо сторінка каже, що юзернейм можна зареєструвати — він ВІЛЬНИЙ
+            if "If you have Telegram, you can contact" in html or "If you have Telegram" in html:
+                return True
+
+        return False
+    except Exception as e:
+        logger.error(f"HTTP check error for @{username}: {e}")
         return False
 
 def generate_username(length: int, include_numbers: bool) -> str:
