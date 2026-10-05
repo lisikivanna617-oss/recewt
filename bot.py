@@ -94,12 +94,43 @@ async def is_user_banned(user_id: int) -> bool:
 async def check_telegram_username(username: str) -> bool:
     username = username.lstrip("@").strip()
     url = f"https://t.me/{username}"
+    
+    if len(username) < 5:
+        return False
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     try:
-        resp = await asyncio.to_thread(requests.get, url, timeout=5)
+        resp = await asyncio.to_thread(requests.get, url, headers=headers, timeout=5)
+        
         if resp.status_code == 200:
-            if "If you have Telegram, you can contact" in resp.text or "Preview channel" in resp.text:
-                return False
+            text = resp.text
+            
+            occupied_indicators = [
+                "tgme_page_title",
+                "tgme_page_extra",
+                "tgme_action_button_new",
+                "If you have Telegram, you can contact",
+                "Preview channel",
+                "You can contact",
+                "subscribers",
+                "members"
+            ]
+            
+            for indicator in occupied_indicators:
+                if indicator in text:
+                    return False
+
+            if "If you have Telegram, you can contact" not in text and "tgme_page_icon" not in text:
+                return True
+
+            return False
+            
+        elif resp.status_code == 404:
             return True
+
         return False
     except Exception as e:
         logger.error(f"Error checking username {username}: {e}")
@@ -138,7 +169,6 @@ def get_main_keyboard(user_id: int, plan: str):
         [InlineKeyboardButton(text="🏷 My Tags", callback_data="menu_tags")],
         [InlineKeyboardButton(text="⭐ Premium & Referrals", callback_data="menu_premium")]
     ]
-    # Адмін панель показується ТІЛЬКИ власнику
     if user_id == ADMIN_ID:
         buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel", callback_data="admin_panel")])
     elif user_id == TESTER_ID:
@@ -158,7 +188,7 @@ async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     
     if await is_user_banned(user_id):
-        await message.answer("❌ Ви забанені в боті.")
+        await message.answer("❌ You are banned from using this bot.")
         return
 
     args = message.text.split()
@@ -190,7 +220,6 @@ async def cmd_start(message: Message, state: FSMContext):
     )
     await message.answer(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
 
-# Повноцінне оброблення команди /tags у чаті
 @dp.message(Command("tags"))
 async def cmd_tags(message: Message):
     user_id = message.from_user.id
@@ -202,7 +231,7 @@ async def cmd_tags(message: Message):
             tags = await cur.fetchall()
 
     if not tags:
-        await message.answer("<b>🏷 My Tags:</b>\nYou have no saved tags.", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>🏷 My Tags:</b>\nYou have no saved tags yet.", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     text = "<b>🏷 Your Saved Tags:</b>\n\n"
@@ -259,32 +288,40 @@ async def cb_process_generate(callback: CallbackQuery):
     include_nums = (parts[2] == "alnum")
 
     plan = await get_user_plan(user_id)
-    # Якщо PREMIUM — шукаємо 5 за раз, якщо FREE — лише 1
-    count_to_check = 5 if "PREMIUM" in plan else 1
+    target_count = 5 if "PREMIUM" in plan else 1
 
-    await callback.answer(f"Searching ({count_to_check} tag)...", show_alert=False)
+    await callback.answer("Searching for available tags...", show_alert=False)
 
-    results = []
+    found_results = []
+    attempts = 0
+    max_attempts = 35
+
     async with aiosqlite.connect(DB_PATH) as db:
-        for _ in range(count_to_check):
+        while len(found_results) < target_count and attempts < max_attempts:
+            attempts += 1
             tag = generate_username(length, include_nums)
-            is_free = await check_telegram_username(tag)
-
+            
             await db.execute("UPDATE stats SET total_searches = total_searches + 1 WHERE id = 1")
+            
+            is_free = await check_telegram_username(tag)
             if is_free:
                 await db.execute("UPDATE stats SET found_usernames = found_usernames + 1 WHERE id = 1")
                 await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (user_id, tag))
-                results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
-            else:
-                results.append(f"❌ <code>@{tag}</code> — TAKEN")
+                found_results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
+            
+            await asyncio.sleep(0.15)
             
         await db.commit()
 
-    header = f"<b>🔎 Search Results ({plan}):</b>\n\n"
-    body = "\n".join(results)
-    
+    if found_results:
+        header = f"<b>🔎 Available Usernames Found ({plan}):</b>\n\n"
+        body = "\n".join(found_results)
+    else:
+        header = "<b>🔎 Search Results:</b>\n\n"
+        body = "❌ No available tags found in this attempt. Try searching again!"
+
     if "PREMIUM" not in plan:
-        body += "\n\n💡 <i>Upgrade to PREMIUM to check 5 usernames at once!</i>"
+        body += "\n\n💡 <i>Upgrade to PREMIUM to search for 5 available tags at once!</i>"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔄 Search Again", callback_data=callback.data)],
@@ -294,7 +331,7 @@ async def cb_process_generate(callback: CallbackQuery):
 
     await callback.message.edit_text(header + body, reply_markup=kb, parse_mode="HTML")
 
-# --- Handlers: Sniper (Premium Only) ---
+# --- Handlers: Sniper ---
 
 @dp.callback_query(F.data == "menu_sniper")
 async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
@@ -396,7 +433,7 @@ async def cb_menu_premium(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
-# --- ADMIN PANEL (ONLY OWNER) ---
+# --- ADMIN PANEL (OWNER ONLY) ---
 
 @dp.callback_query(F.data == "admin_panel")
 async def cb_admin_panel(callback: CallbackQuery):
@@ -499,7 +536,7 @@ async def process_admin_unban(message: Message, state: FSMContext):
 async def cb_admin_broadcast(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID: return
     await state.set_state(Form.waiting_for_broadcast)
-    await callback.message.edit_text("Send text/photo message for Broadcast:", reply_markup=get_back_keyboard())
+    await callback.message.edit_text("Send text or photo message to Broadcast:", reply_markup=get_back_keyboard())
     await callback.answer()
 
 @dp.message(Form.waiting_for_broadcast)
