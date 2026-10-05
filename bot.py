@@ -17,14 +17,20 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- Configuration & Logging ---
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "5619415334"))
 TESTER_ID = int(os.environ.get("TESTER_ID", "8644168067"))
 DB_PATH = "bot_database.db"
 
-# 👇 ДОДАЙ ЦІ ДВА РЯДКИ СЮДИ:
-CHANNEL_ID = os.environ.get("CHANNEL_ID", "@otxen")  # Юзернейм каналу з @
-CHANNEL_URL = "https://t.me/otxen"                   # Пряме посилання
+# --- Channel Configuration ---
+CHANNEL_ID = -1003979599792
+CHANNEL_URL = "https://t.me/otxen"
+
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
 
 # --- Web Server ---
 web_app = Flask(__name__)
@@ -91,47 +97,28 @@ async def is_user_banned(user_id: int) -> bool:
             row = await cur.fetchone()
             return bool(row[0]) if row and row[0] else False
 
+async def check_subscription(user_id: int) -> bool:
+    if user_id in (ADMIN_ID, TESTER_ID):
+        return True
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ["creator", "administrator", "member"]
+    except Exception as e:
+        logger.error(f"Error checking subscription: {e}")
+        return True
+
 async def check_telegram_username(username: str) -> bool:
     username = username.lstrip("@").strip()
     if len(username) < 5:
         return False
 
     try:
-        # Намагаємося отримати інформацію про чат/юзера через Telegram Bot API
         await bot.get_chat(f"@{username}")
-        # Якщо чат знайдено — юзернейм ЗАЙНЯТИЙ
         return False
     except Exception as e:
         err_msg = str(e).lower()
-        # Якщо Telegram відповідає, що чат не знайдено — юзернейм ВІЛЬНИЙ
         if "chat not found" in err_msg or "user not found" in err_msg:
             return True
-        # У разі інших помилок (наприклад, суворий флуд-контроль)
-        return False
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    try:
-        resp = await asyncio.to_thread(requests.get, url, headers=headers, timeout=4)
-        if resp.status_code == 200:
-            text = resp.text
-            occupied_indicators = [
-                "tgme_page_title", "tgme_page_extra", "tgme_action_button_new",
-                "If you have Telegram, you can contact", "Preview channel",
-                "You can contact", "subscribers", "members"
-            ]
-            for indicator in occupied_indicators:
-                if indicator in text:
-                    return False
-            if "If you have Telegram, you can contact" not in text and "tgme_page_icon" not in text:
-                return True
-            return False
-        elif resp.status_code == 404:
-            return True
-        return False
-    except Exception:
         return False
 
 def generate_username(length: int, include_numbers: bool) -> str:
@@ -184,7 +171,12 @@ async def check_and_update_limits(user_id: int, plan: str) -> tuple[bool, int]:
         await db.commit()
         return True, max_free_limit - (searches + 1)
 
-# Оновлене англійське меню
+def get_sub_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Join Our Channel", url=CHANNEL_URL)],
+        [InlineKeyboardButton(text="✅ I Have Subscribed", callback_data="check_sub")]
+    ])
+
 def get_main_keyboard(user_id: int, plan: str):
     buttons = [
         [InlineKeyboardButton(text="⚡ Generate & Search Tags", callback_data="menu_search_gen")],
@@ -201,7 +193,7 @@ def get_main_keyboard(user_id: int, plan: str):
 
 def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️️ Back to Menu", callback_data="main_menu")]
+        [InlineKeyboardButton(text="⬅ Back to Menu", callback_data="main_menu")]
     ])
 # --- Handlers: Start & Commands ---
 
@@ -212,6 +204,14 @@ async def cmd_start(message: Message, state: FSMContext):
     
     if await is_user_banned(user_id):
         await message.answer("❌ You are banned from using TagPulse.")
+        return
+
+    if not await check_subscription(user_id):
+        text = (
+            "⚠ <b>Access Restricted!</b>\n\n"
+            "To use <b>TagPulse Bot</b>, please subscribe to our official channel where we publish all our projects and updates!"
+        )
+        await message.answer(text, reply_markup=get_sub_keyboard(), parse_mode="HTML")
         return
 
     args = message.text.split()
@@ -244,10 +244,29 @@ async def cmd_start(message: Message, state: FSMContext):
     )
     await message.answer(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
 
+@dp.callback_query(F.data == "check_sub")
+async def cb_check_sub(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    if await check_subscription(user_id):
+        await callback.answer("✅ Thank you for subscribing!", show_alert=False)
+        plan = await get_user_plan(user_id)
+        text = (
+            f"⚡ <b>TagPulse Main Menu</b>\n\n"
+            f"👤 <b>Plan Status:</b> <code>{plan}</code>\n"
+            f"Choose an option below:"
+        )
+        await callback.message.edit_text(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
+    else:
+        await callback.answer("❌ You are still not subscribed to the channel!", show_alert=True)
+
 @dp.message(Command("tags"))
 async def cmd_tags(message: Message):
     user_id = message.from_user.id
     if await is_user_banned(user_id):
+        return
+
+    if not await check_subscription(user_id):
+        await message.answer("⚠ Please subscribe to our channel first!", reply_markup=get_sub_keyboard(), parse_mode="HTML")
         return
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -273,6 +292,10 @@ async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ You are banned.", show_alert=True)
         return
 
+    if not await check_subscription(user_id):
+        await callback.message.edit_text("⚠ Please subscribe to our channel to access the bot!", reply_markup=get_sub_keyboard(), parse_mode="HTML")
+        return
+
     plan = await get_user_plan(user_id)
     text = (
         f"⚡ <b>TagPulse Main Menu</b>\n\n"
@@ -285,7 +308,9 @@ async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "menu_search_gen")
 async def cb_menu_search_gen(callback: CallbackQuery):
-    if await is_user_banned(callback.from_user.id):
+    if await is_user_banned(callback.from_user.id): return
+    if not await check_subscription(callback.from_user.id):
+        await callback.message.edit_text("⚠ Subscribe to channel first!", reply_markup=get_sub_keyboard())
         return
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -297,7 +322,7 @@ async def cb_menu_search_gen(callback: CallbackQuery):
          InlineKeyboardButton(text="🔢 7 Chars (Mixed)", callback_data="gen_7_alnum")],
         [InlineKeyboardButton(text="🔤 8 Chars (Letters)", callback_data="gen_8_alpha"),
          InlineKeyboardButton(text="🔢 8 Chars (Mixed)", callback_data="gen_8_alnum")],
-        [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton(text="⬅️️ Back", callback_data="main_menu")]
     ])
     text = "<b>🎲 Select username length and format to search:</b>"
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
@@ -306,7 +331,9 @@ async def cb_menu_search_gen(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("gen_"))
 async def cb_process_generate(callback: CallbackQuery):
     user_id = callback.from_user.id
-    if await is_user_banned(user_id):
+    if await is_user_banned(user_id): return
+    if not await check_subscription(user_id):
+        await callback.message.edit_text("⚠ Subscribe to channel first!", reply_markup=get_sub_keyboard())
         return
 
     plan = await get_user_plan(user_id)
@@ -323,11 +350,11 @@ async def cb_process_generate(callback: CallbackQuery):
     is_premium = "PREMIUM" in plan
     target_count = 3 if is_premium else 1
 
-    await callback.answer("⚡ Searching for available tags...", show_alert=False)
+    await callback.answer("⚡ Searching with 2.5x priority speed..." if is_premium else "Searching...", show_alert=False)
 
     found_results = []
     attempts = 0
-    max_attempts = 25  # Ліміт перевірок за один клік, щоб бот не зависав
+    max_attempts = 25
 
     async with aiosqlite.connect(DB_PATH) as db:
         while len(found_results) < target_count and attempts < max_attempts:
@@ -342,8 +369,7 @@ async def cb_process_generate(callback: CallbackQuery):
                 await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (user_id, tag))
                 found_results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
             
-            # Мікро-пауза, щоб Telegram не дав FloodWait
-            await asyncio.sleep(0.1 if is_premium else 0.25)
+            await asyncio.sleep(0.06 if is_premium else 0.15)
             
         await db.commit()
 
@@ -352,7 +378,7 @@ async def cb_process_generate(callback: CallbackQuery):
         body = "\n".join(found_results)
     else:
         header = "<b>🔎 Search Results:</b>\n\n"
-        body = f"❌ Checked {attempts} generated tags, but none were free this time. Click below to try again!"
+        body = f"❌ Checked {attempts} generated tags, but none were free. Click below to try again!"
 
     if not is_premium:
         body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for 2.5x faster search & 3 tags per click!</i>"
@@ -372,7 +398,9 @@ async def cb_process_generate(callback: CallbackQuery):
 @dp.callback_query(F.data == "menu_sniper")
 async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
-    if await is_user_banned(user_id):
+    if await is_user_banned(user_id): return
+    if not await check_subscription(user_id):
+        await callback.message.edit_text("⚠ Subscribe to channel first!", reply_markup=get_sub_keyboard())
         return
 
     plan = await get_user_plan(user_id)
@@ -391,8 +419,7 @@ async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
 @dp.message(Form.waiting_for_snipe_tag)
 async def process_snipe_tag(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    if await is_user_banned(user_id):
-        return
+    if await is_user_banned(user_id): return
 
     tag = message.text.strip().lstrip("@")
     async with aiosqlite.connect(DB_PATH) as db:
@@ -439,7 +466,9 @@ async def cb_menu_tags(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "menu_premium")
 async def cb_menu_premium(callback: CallbackQuery):
-    if await is_user_banned(callback.from_user.id):
+    if await is_user_banned(callback.from_user.id): return
+    if not await check_subscription(callback.from_user.id):
+        await callback.message.edit_text("⚠ Subscribe to channel first!", reply_markup=get_sub_keyboard())
         return
 
     plan = await get_user_plan(callback.from_user.id)
@@ -451,7 +480,6 @@ async def cb_menu_premium(callback: CallbackQuery):
             row = await cur.fetchone()
             refs = row[0] if row else 0
 
-    # Новий англійський інтерфейс відповідно до поста
     text = (
         f"⚡ <b>TagPulse Premium</b>\n\n"
         f"Your ultimate tool for hunting rare usernames 🎯\n\n"
