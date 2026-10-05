@@ -7,10 +7,11 @@ import sys
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# 👇 Enter your Telegram ID here for testing via /addref
+# 👇 Enter your Telegram ID here to test referral rewards via /addref
 TEST_ADMIN_ID = 5619415334  # Replace with your ID
 
 bot = Bot(token=TOKEN)
@@ -88,7 +89,7 @@ def update_referral_progress(referrer_id: int):
             asyncio.create_task(
                 bot.send_message(
                     referrer_id, 
-                    f"⚡ Premium unlocked: <b>+{days_to_add} days</b>",
+                    f"⚡ <b>[Update]</b> Referral milestone reached! Premium unlocked for <b>+{days_to_add} days</b> 🎉",
                     parse_mode="HTML"
                 )
             )
@@ -97,8 +98,8 @@ def update_referral_progress(referrer_id: int):
 # --- MINIMALIST KEYBOARDS ---
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium"),
-         InlineKeyboardButton(text="🔍 Monitor", callback_data="menu_monitor")]
+        [InlineKeyboardButton(text="💎 Premium & Referrals", callback_data="menu_premium")],
+        [InlineKeyboardButton(text="🔍 Pulse Monitor", callback_data="menu_monitor")]
     ])
 
 def get_back_keyboard():
@@ -128,9 +129,9 @@ async def cmd_start(message: Message):
             update_referral_progress(referrer_id)
 
     text = (
-        "<b>TagTrack</b>\n"
-        "<i>Username monitoring & analytics.</i>\n\n"
-        "Select an option below:"
+        "<b>TagPulse</b>\n"
+        "<i>Real-time username tracking & analytics.</i>\n\n"
+        "Select an option below or send a username to check it:"
     )
     await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
 
@@ -146,7 +147,7 @@ async def test_add_referral(message: Message):
     user_data = get_user(message.from_user.id)
     
     await message.answer(
-        f"[TEST] Referral added.\n"
+        f"🧪 <b>[TEST]</b> Referral processed successfully.\n"
         f"Scale: <code>{user_data[2]}/5</code> | Total: <code>{user_data[3]}</code>",
         parse_mode="HTML"
     )
@@ -160,11 +161,11 @@ async def show_premium_info(callback: CallbackQuery):
     total_invited = user_data[3] if user_data else 0
     prem_until_str = user_data[4] if user_data else None
     
-    prem_status = "Inactive"
+    prem_status = "Inactive ❌"
     if prem_until_str:
         prem_date = datetime.datetime.fromisoformat(prem_until_str)
         if prem_date > datetime.datetime.now():
-            prem_status = f"Active until {prem_date.strftime('%d.%m %H:%M')}"
+            prem_status = f"Active until {prem_date.strftime('%d.%m %H:%M')} ✅"
 
     bot_info = await bot.get_me()
     ref_link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
@@ -172,12 +173,12 @@ async def show_premium_info(callback: CallbackQuery):
     text = (
         "<b>[ Premium & Referrals ]</b>\n\n"
         f"Status: <b>{prem_status}</b>\n"
-        f"Scale: <code>{ref_count}/5</code>\n"
-        f"Invited friends: <code>{total_invited}</code>\n\n"
+        f"Scale progress: <code>{ref_count}/5</code>\n"
+        f"Total invited: <code>{total_invited}</code>\n\n"
         "<b>Rewards:</b>\n"
-        "• 2 referrals → +1 day\n"
-        "• 3 referrals → +3 days\n"
-        "• 5 referrals → +7 days (scale resets)\n\n"
+        "• 2 referrals → +1 day Premium\n"
+        "• 3 referrals → +3 days Premium\n"
+        "• 5 referrals → +7 days Premium (scale resets)\n\n"
         "<b>Your referral link:</b>\n"
         f"<code>{ref_link}</code>"
     )
@@ -188,9 +189,9 @@ async def show_premium_info(callback: CallbackQuery):
 @dp.callback_query(F.data == "menu_monitor")
 async def show_monitor_menu(callback: CallbackQuery):
     text = (
-        "<b>[ Username Monitor ]</b>\n\n"
-        "Send a username to check or start monitoring.\n\n"
-        "<i>Free: 1 slot | Premium: 5–10 slots + auto alerts</i>"
+        "<b>[ Pulse Monitor ]</b>\n\n"
+        "Send any username (e.g. <code>durov</code> or <code>@username</code>) to check its availability status right now.\n\n"
+        "<i>Free: 1 slot | Premium: 5–10 slots + instant alerts</i>"
     )
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
@@ -198,17 +199,56 @@ async def show_monitor_menu(callback: CallbackQuery):
 @dp.callback_query(F.data == "menu_back")
 async def back_to_main(callback: CallbackQuery):
     text = (
-        "<b>TagTrack</b>\n"
-        "<i>Username monitoring & analytics.</i>\n\n"
-        "Select an option below:"
+        "<b>TagPulse</b>\n"
+        "<i>Real-time username tracking & analytics.</i>\n\n"
+        "Select an option below or send a username to check it:"
     )
     await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
     await callback.answer()
 
+# --- USERNAME CHECKER HANDLER ---
+@dp.message(F.text & ~F.text.startswith("/"))
+async def check_username(message: Message):
+    raw_text = message.text.strip()
+    username = raw_text.lstrip("@").strip()
+    
+    if len(username) < 5:
+        await message.answer("⚠️ Username must be at least 5 characters long according to Telegram rules.")
+        return
+
+    processing_msg = await message.answer(f"🔍 Checking <code>@{username}</code>...", parse_mode="HTML")
+
+    try:
+        chat = await bot.get_chat(f"@{username}")
+        
+        # Determine account type
+        chat_type = chat.type
+        title_name = chat.title or chat.full_name or "Unknown"
+        
+        result_text = (
+            f"<b>[ Username Status ]</b>\n\n"
+            f"Target: <code>@{username}</code>\n"
+            f"Status: <b>Occupied ❌</b>\n"
+            f"Type: <code>{chat_type}</code>\n"
+            f"Name: <b>{title_name}</b>"
+        )
+    except TelegramBadRequest:
+        # If chat is not found, the username is likely available (or banned/restricted)
+        result_text = (
+            f"<b>[ Username Status ]</b>\n\n"
+            f"Target: <code>@{username}</code>\n"
+            f"Status: <b>Available / Not Found ✅</b>\n"
+            f"<i>(Tip: Verify directly in Telegram search)</i>"
+        )
+    except Exception:
+        result_text = f"⚠️ Error checking <code>@{username}</code>. Try again later."
+
+    await processing_msg.edit_text(result_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagTrack Minimalist Bot is online!")
+    print("TagPulse Bot with Username Checker is online!")
     try:
         await dp.start_polling(bot)
     finally:
@@ -218,4 +258,3 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
-        
