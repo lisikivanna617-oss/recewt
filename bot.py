@@ -28,7 +28,7 @@ DB_PATH = "bot_database.db"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# --- Web Server for Health Checks ---
+# --- Web Server ---
 web_app = Flask(__name__)
 
 @web_app.route("/")
@@ -43,6 +43,9 @@ def run_web():
 class Form(StatesGroup):
     waiting_for_snipe_tag = State()
     waiting_for_admin_give_perm = State()
+    waiting_for_ban_id = State()
+    waiting_for_unban_id = State()
+    waiting_for_broadcast = State()
 
 # --- Database Setup ---
 async def init_db():
@@ -53,7 +56,8 @@ async def init_db():
                 plan TEXT DEFAULT 'FREE',
                 premium_until DATETIME,
                 referrals INTEGER DEFAULT 0,
-                referred_by INTEGER
+                referred_by INTEGER,
+                is_banned INTEGER DEFAULT 0
             )
         """)
         await db.execute("""
@@ -81,6 +85,12 @@ async def init_db():
         await db.execute("INSERT OR IGNORE INTO stats (id, total_searches, found_usernames) VALUES (1, 0, 0)")
         await db.commit()
 # --- Helper Functions ---
+async def is_user_banned(user_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT is_banned FROM users WHERE user_id = ?", (user_id,)) as cur:
+            row = await cur.fetchone()
+            return bool(row[0]) if row and row[0] else False
+
 async def check_telegram_username(username: str) -> bool:
     username = username.lstrip("@").strip()
     url = f"https://t.me/{username}"
@@ -99,14 +109,13 @@ def generate_username(length: int, include_numbers: bool) -> str:
     chars = string.ascii_lowercase
     if include_numbers:
         chars += string.digits
-    # Telegram юзернейм повинен починатися з букви
     first_char = random.choice(string.ascii_lowercase)
     rest_chars = ''.join(random.choice(chars) for _ in range(length - 1))
     return first_char + rest_chars
 
 async def get_user_plan(user_id: int) -> str:
-    if user_id in (ADMIN_ID, TESTER_ID):
-        return "PREMIUM (Staff)"
+    if user_id == ADMIN_ID:
+        return "PREMIUM (Owner)"
 
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT plan, premium_until FROM users WHERE user_id = ?", (user_id,)) as cur:
@@ -129,22 +138,29 @@ def get_main_keyboard(user_id: int, plan: str):
         [InlineKeyboardButton(text="🏷 My Tags", callback_data="menu_tags")],
         [InlineKeyboardButton(text="⭐ Premium & Referrals", callback_data="menu_premium")]
     ]
+    # Адмін панель показується ТІЛЬКИ власнику
     if user_id == ADMIN_ID:
         buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel", callback_data="admin_panel")])
-    if user_id in (ADMIN_ID, TESTER_ID):
+    elif user_id == TESTER_ID:
         buttons.append([InlineKeyboardButton(text="🧪 Tester Panel", callback_data="tester_panel")])
+        
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅️ Back to Menu", callback_data="main_menu")]
     ])
-# --- Handlers: Start & Main Menu ---
+# --- Handlers: Start & Commands ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
+    
+    if await is_user_banned(user_id):
+        await message.answer("❌ Ви забанені в боті.")
+        return
+
     args = message.text.split()
     referrer_id = int(args[1]) if len(args) > 1 and args[1].isdigit() else None
 
@@ -174,9 +190,34 @@ async def cmd_start(message: Message, state: FSMContext):
     )
     await message.answer(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
 
+# Повноцінне оброблення команди /tags у чаті
+@dp.message(Command("tags"))
+async def cmd_tags(message: Message):
+    user_id = message.from_user.id
+    if await is_user_banned(user_id):
+        return
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT tag_name FROM user_tags WHERE user_id = ?", (user_id,)) as cur:
+            tags = await cur.fetchall()
+
+    if not tags:
+        await message.answer("<b>🏷 My Tags:</b>\nYou have no saved tags.", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        return
+
+    text = "<b>🏷 Your Saved Tags:</b>\n\n"
+    for t in tags:
+        text += f"• <code>@{t[0]}</code>\n"
+
+    await message.answer(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+
 @dp.callback_query(F.data == "main_menu")
 async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
+    if await is_user_banned(callback.from_user.id):
+        await callback.answer("❌ You are banned.", show_alert=True)
+        return
+
     plan = await get_user_plan(callback.from_user.id)
     text = (
         f"👋 <b>TagPulse Main Menu</b>\n\n"
@@ -189,14 +230,17 @@ async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "menu_search_gen")
 async def cb_menu_search_gen(callback: CallbackQuery):
+    if await is_user_banned(callback.from_user.id):
+        return
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔤 5 chars (Letters only)", callback_data="gen_5_alpha"),
+        [InlineKeyboardButton(text="🔤 5 chars (Letters)", callback_data="gen_5_alpha"),
          InlineKeyboardButton(text="🔢 5 chars (Letters+Digits)", callback_data="gen_5_alnum")],
-        [InlineKeyboardButton(text="🔤 6 chars (Letters only)", callback_data="gen_6_alpha"),
+        [InlineKeyboardButton(text="🔤 6 chars (Letters)", callback_data="gen_6_alpha"),
          InlineKeyboardButton(text="🔢 6 chars (Letters+Digits)", callback_data="gen_6_alnum")],
-        [InlineKeyboardButton(text="🔤 7 chars (Letters only)", callback_data="gen_7_alpha"),
+        [InlineKeyboardButton(text="🔤 7 chars (Letters)", callback_data="gen_7_alpha"),
          InlineKeyboardButton(text="🔢 7 chars (Letters+Digits)", callback_data="gen_7_alnum")],
-        [InlineKeyboardButton(text="🔤 8 chars (Letters only)", callback_data="gen_8_alpha"),
+        [InlineKeyboardButton(text="🔤 8 chars (Letters)", callback_data="gen_8_alpha"),
          InlineKeyboardButton(text="🔢 8 chars (Letters+Digits)", callback_data="gen_8_alnum")],
         [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
     ])
@@ -206,42 +250,61 @@ async def cb_menu_search_gen(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("gen_"))
 async def cb_process_generate(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    if await is_user_banned(user_id):
+        return
+
     parts = callback.data.split("_")
     length = int(parts[1])
     include_nums = (parts[2] == "alnum")
 
-    tag = generate_username(length, include_nums)
-    await callback.answer(f"Checking @{tag}...", show_alert=False)
+    plan = await get_user_plan(user_id)
+    # Якщо PREMIUM — шукаємо 5 за раз, якщо FREE — лише 1
+    count_to_check = 5 if "PREMIUM" in plan else 1
 
-    is_free = await check_telegram_username(tag)
+    await callback.answer(f"Searching ({count_to_check} tag)...", show_alert=False)
 
+    results = []
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE stats SET total_searches = total_searches + 1 WHERE id = 1")
-        if is_free:
-            await db.execute("UPDATE stats SET found_usernames = found_usernames + 1 WHERE id = 1")
-            await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (callback.from_user.id, tag))
+        for _ in range(count_to_check):
+            tag = generate_username(length, include_nums)
+            is_free = await check_telegram_username(tag)
+
+            await db.execute("UPDATE stats SET total_searches = total_searches + 1 WHERE id = 1")
+            if is_free:
+                await db.execute("UPDATE stats SET found_usernames = found_usernames + 1 WHERE id = 1")
+                await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (user_id, tag))
+                results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
+            else:
+                results.append(f"❌ <code>@{tag}</code> — TAKEN")
+            
         await db.commit()
 
-    if is_free:
-        status_text = f"✅ <b>Generated Username @{tag} is AVAILABLE!</b>\nSaved to your /tags list."
-    else:
-        status_text = f"❌ <b>Generated Username @{tag} is TAKEN.</b>"
+    header = f"<b>🔎 Search Results ({plan}):</b>\n\n"
+    body = "\n".join(results)
+    
+    if "PREMIUM" not in plan:
+        body += "\n\n💡 <i>Upgrade to PREMIUM to check 5 usernames at once!</i>"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔄 Try Again", callback_data=callback.data)],
+        [InlineKeyboardButton(text="🔄 Search Again", callback_data=callback.data)],
         [InlineKeyboardButton(text="⚙️ Change Options", callback_data="menu_search_gen")],
         [InlineKeyboardButton(text="⬅️ Back to Menu", callback_data="main_menu")]
     ])
 
-    await callback.message.edit_text(status_text, reply_markup=kb, parse_mode="HTML")
+    await callback.message.edit_text(header + body, reply_markup=kb, parse_mode="HTML")
 
 # --- Handlers: Sniper (Premium Only) ---
 
 @dp.callback_query(F.data == "menu_sniper")
 async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
-    plan = await get_user_plan(callback.from_user.id)
+    user_id = callback.from_user.id
+    if await is_user_banned(user_id):
+        return
+
+    plan = await get_user_plan(user_id)
     if "PREMIUM" not in plan:
-        await callback.answer("🔒 Sniper is for PREMIUM users only! Invite 3 friends to get Premium.", show_alert=True)
+        await callback.answer("🔒 Sniper is for PREMIUM users only!", show_alert=True)
         return
 
     await state.set_state(Form.waiting_for_snipe_tag)
@@ -254,26 +317,28 @@ async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
 
 @dp.message(Form.waiting_for_snipe_tag)
 async def process_snipe_tag(message: Message, state: FSMContext):
-    plan = await get_user_plan(message.from_user.id)
+    user_id = message.from_user.id
+    if await is_user_banned(user_id):
+        return
+
+    plan = await get_user_plan(user_id)
     if "PREMIUM" not in plan:
         await message.answer("🔒 Premium required for Sniper.", reply_markup=get_back_keyboard())
         await state.clear()
         return
 
     tag = message.text.strip().lstrip("@")
-    
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO snipes (user_id, username, status) VALUES (?, ?, 'ACTIVE')", (message.from_user.id, tag))
+        await db.execute("INSERT INTO snipes (user_id, username, status) VALUES (?, ?, 'ACTIVE')", (user_id, tag))
         await db.commit()
 
     await message.answer(
-        f"🎯 Added <code>@{tag}</code> to Sniper queue! We will notify you as soon as it becomes available.",
+        f"🎯 Added <code>@{tag}</code> to Sniper queue!",
         reply_markup=get_back_keyboard(),
         parse_mode="HTML"
     )
     await state.clear()
 
-# --- Background Worker for Sniper ---
 async def sniper_background_worker():
     while True:
         try:
@@ -303,23 +368,14 @@ async def sniper_background_worker():
 
 @dp.callback_query(F.data == "menu_tags")
 async def cb_menu_tags(callback: CallbackQuery):
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT tag_name FROM user_tags WHERE user_id = ?", (callback.from_user.id,)) as cur:
-            tags = await cur.fetchall()
-
-    if not tags:
-        await callback.message.edit_text("<b>🏷 My Tags:</b>\nYou have no assigned tags.", reply_markup=get_back_keyboard(), parse_mode="HTML")
-        return
-
-    text = "<b>🏷 Your Tags:</b>\n\n"
-    for t in tags:
-        text += f"• <code>#{t[0]}</code>\n"
-
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await cmd_tags(callback.message)
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_premium")
 async def cb_menu_premium(callback: CallbackQuery):
+    if await is_user_banned(callback.from_user.id):
+        return
+
     plan = await get_user_plan(callback.from_user.id)
     bot_info = await bot.get_me()
     ref_link = f"https://t.me/{bot_info.username}?start={callback.from_user.id}"
@@ -340,12 +396,12 @@ async def cb_menu_premium(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
-# --- Admin & Tester Panels ---
+# --- ADMIN PANEL (ONLY OWNER) ---
 
 @dp.callback_query(F.data == "admin_panel")
 async def cb_admin_panel(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Access Denied: Admin only!", show_alert=True)
+        await callback.answer("Access Denied: Owner only!", show_alert=True)
         return
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -356,7 +412,7 @@ async def cb_admin_panel(callback: CallbackQuery):
             searches, found = (st[0], st[1]) if st else (0, 0)
 
     text = (
-        "<b>⚙️ Admin Panel</b>\n\n"
+        "<b>⚙️ Owner Admin Panel</b>\n\n"
         f"• Total Users: <code>{total_users}</code>\n"
         f"• Total Searches: <code>{searches}</code>\n"
         f"• Found Tags: <code>{found}</code>\n"
@@ -364,39 +420,111 @@ async def cb_admin_panel(callback: CallbackQuery):
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐ Give Premium", callback_data="admin_give_prem")],
+        [InlineKeyboardButton(text="🚫 Ban User", callback_data="admin_ban"), InlineKeyboardButton(text="✅ Unban User", callback_data="admin_unban")],
+        [InlineKeyboardButton(text="📢 Broadcast Message", callback_data="admin_broadcast")],
         [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
     ])
 
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
 
+# --- Admin Function: Give Premium ---
 @dp.callback_query(F.data == "admin_give_prem")
 async def cb_admin_give_prem(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        return
+    if callback.from_user.id != ADMIN_ID: return
     await state.set_state(Form.waiting_for_admin_give_perm)
-    await callback.message.edit_text("Enter User ID to give Premium:", reply_markup=get_back_keyboard())
+    await callback.message.edit_text("Enter User ID and Days (e.g. <code>123456789 30</code>):", reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 @dp.message(Form.waiting_for_admin_give_perm)
 async def process_admin_give_prem(message: Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
+    if message.from_user.id != ADMIN_ID: return
     try:
-        target_id = int(message.text.strip())
-        until = datetime.datetime.now() + datetime.timedelta(days=30)
+        parts = message.text.strip().split()
+        target_id = int(parts[0])
+        days = int(parts[1]) if len(parts) > 1 else 30
+
+        until = datetime.datetime.now() + datetime.timedelta(days=days)
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("UPDATE users SET plan = 'PREMIUM', premium_until = ? WHERE user_id = ?", (until, target_id))
             await db.commit()
-        await message.answer(f"Granted 30 days Premium to user {target_id}!")
+        await message.answer(f"✅ Granted {days} days Premium to user <code>{target_id}</code>!", parse_mode="HTML")
+    except Exception:
+        await message.answer("❌ Invalid format! Use: <code>USER_ID DAYS</code>")
+    await state.clear()
+
+# --- Admin Function: Ban & Unban ---
+@dp.callback_query(F.data == "admin_ban")
+async def cb_admin_ban(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.set_state(Form.waiting_for_ban_id)
+    await callback.message.edit_text("Send User ID to BAN:", reply_markup=get_back_keyboard())
+    await callback.answer()
+
+@dp.message(Form.waiting_for_ban_id)
+async def process_admin_ban(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    try:
+        target_id = int(message.text.strip())
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (target_id,))
+            await db.commit()
+        await message.answer(f"🚫 User <code>{target_id}</code> has been BANNED.", parse_mode="HTML")
     except ValueError:
         await message.answer("Invalid User ID.")
     await state.clear()
 
+@dp.callback_query(F.data == "admin_unban")
+async def cb_admin_unban(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.set_state(Form.waiting_for_unban_id)
+    await callback.message.edit_text("Send User ID to UNBAN:", reply_markup=get_back_keyboard())
+    await callback.answer()
+
+@dp.message(Form.waiting_for_unban_id)
+async def process_admin_unban(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    try:
+        target_id = int(message.text.strip())
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (target_id,))
+            await db.commit()
+        await message.answer(f"✅ User <code>{target_id}</code> UNBANNED.", parse_mode="HTML")
+    except ValueError:
+        await message.answer("Invalid User ID.")
+    await state.clear()
+
+# --- Admin Function: Broadcast ---
+@dp.callback_query(F.data == "admin_broadcast")
+async def cb_admin_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.set_state(Form.waiting_for_broadcast)
+    await callback.message.edit_text("Send text/photo message for Broadcast:", reply_markup=get_back_keyboard())
+    await callback.answer()
+
+@dp.message(Form.waiting_for_broadcast)
+async def process_admin_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT user_id FROM users WHERE is_banned = 0") as cur:
+            users = await cur.fetchall()
+
+    success, failed = 0, 0
+    for u in users:
+        try:
+            await message.copy_to(chat_id=u[0])
+            success += 1
+        except Exception:
+            failed += 1
+
+    await message.answer(f"📢 <b>Broadcast Finished!</b>\n\n✅ Delivered: {success}\n❌ Failed: {failed}", parse_mode="HTML")
+    await state.clear()
+
+# --- Tester Panel ---
 @dp.callback_query(F.data == "tester_panel")
 async def cb_tester_panel(callback: CallbackQuery):
     if callback.from_user.id not in (ADMIN_ID, TESTER_ID):
-        await callback.answer("Access Denied: Testers only!", show_alert=True)
         return
 
     text = "<b>🧪 Tester Panel</b>\nChoose a test function:"
@@ -404,7 +532,6 @@ async def cb_tester_panel(callback: CallbackQuery):
         [InlineKeyboardButton(text="🔔 Test Notification", callback_data="test_notify")],
         [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
     ])
-
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
 
@@ -415,8 +542,6 @@ async def cb_test_notify(callback: CallbackQuery):
 
 async def main():
     await init_db()
-    
-    # Запуск фонового снайпера
     asyncio.create_task(sniper_background_worker())
     
     logger.info("TagPulse Bot initialized and starting polling...")
@@ -429,7 +554,5 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         
-    # Запуск Flask-сервера у фоновому потоці для Render
     threading.Thread(target=run_web, daemon=True).start()
-    
     asyncio.run(main())
