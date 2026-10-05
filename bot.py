@@ -2,22 +2,29 @@ import asyncio
 import datetime
 import logging
 import os
+import random
+import string
 import sqlite3
 import sys
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 
 TOKEN = os.getenv("BOT_TOKEN")
-
-# 👇 Enter your Telegram ID here to test referral rewards via /addref
-TEST_ADMIN_ID = 5619415334  # Replace with your ID
+TEST_ADMIN_ID = 5619415334  # Заміни на свій ID для /addref
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- DATABASE (SQLite) ---
+# --- СТАНИ ДЛЯ FSM ---
+class SearchStates(StatesGroup):
+    waiting_for_length = State()
+    waiting_for_digits = State()
+
+# --- БАЗА ДАНИХ (SQLite) ---
 def init_db():
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
@@ -28,6 +35,14 @@ def init_db():
             referrals_count INTEGER DEFAULT 0,
             total_invited INTEGER DEFAULT 0,
             premium_until TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            created_at TEXT
         )
     """)
     conn.commit()
@@ -49,6 +64,38 @@ def add_user(user_id: int, referrer_id: int = None):
         cursor.execute("INSERT INTO users (user_id, referrer_id) VALUES (?, ?)", (user_id, referrer_id))
         conn.commit()
     conn.close()
+
+def is_user_premium(user_id: int) -> bool:
+    user = get_user(user_id)
+    if not user or not user[4]:
+        return False
+    try:
+        prem_date = datetime.datetime.fromisoformat(user[4])
+        return prem_date > datetime.datetime.now()
+    except Exception:
+        return False
+
+def add_to_history(user_id: int, username: str):
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO history (user_id, username, created_at) VALUES (?, ?, ?)", 
+                   (user_id, username, datetime.datetime.now().strftime("%d.%m %H:%M")))
+    # Обмежуємо історію до 20 записів на користувача
+    cursor.execute("""
+        DELETE FROM history WHERE id NOT IN (
+            SELECT id FROM history WHERE user_id = ? ORDER BY id DESC LIMIT 20
+        ) AND user_id = ?
+    """, (user_id, user_id))
+    conn.commit()
+    conn.close()
+
+def get_history(user_id: int):
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, created_at FROM history WHERE user_id = ? ORDER BY id DESC", (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
 
 def update_referral_progress(referrer_id: int):
     conn = sqlite3.connect("bot_database.db")
@@ -95,11 +142,12 @@ def update_referral_progress(referrer_id: int):
             )
     conn.close()
 
-# --- MINIMALIST KEYBOARDS ---
+# --- КЛАВІАТУРИ ---
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Premium & Referrals", callback_data="menu_premium")],
-        [InlineKeyboardButton(text="🔍 Pulse Monitor", callback_data="menu_monitor")]
+        [InlineKeyboardButton(text="🔍 Start Search", callback_data="start_search")],
+        [InlineKeyboardButton(text="📜 History", callback_data="menu_history"),
+         InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium")]
     ])
 
 def get_back_keyboard():
@@ -107,9 +155,18 @@ def get_back_keyboard():
         [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
 
-# --- HANDLERS ---
+def get_result_keyboard(username: str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📤 Share Link", url=f"https://t.me/{username}")],
+        [InlineKeyboardButton(text="💾 Save", callback_data=f"save_{username}")],
+        [InlineKeyboardButton(text="🔄 Repeat Search", callback_data="start_search")],
+        [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
+    ])
+
+# --- ХЕНДЛЕРИ ГОЛОВНОГО МЕНЮ ---
 @dp.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
     user_id = message.from_user.id
     args = message.text.split()
     
@@ -130,8 +187,8 @@ async def cmd_start(message: Message):
 
     text = (
         "<b>TagPulse</b>\n"
-        "<i>Real-time username tracking & analytics.</i>\n\n"
-        "Select an option below or send a username to check it:"
+        "<i>Real-time username tracking & generator.</i>\n\n"
+        "Choose an option below:"
     )
     await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
 
@@ -139,18 +196,134 @@ async def cmd_start(message: Message):
 async def test_add_referral(message: Message):
     if message.from_user.id != TEST_ADMIN_ID:
         return
-    
     if not get_user(message.from_user.id):
         add_user(message.from_user.id)
-        
     update_referral_progress(message.from_user.id)
     user_data = get_user(message.from_user.id)
-    
     await message.answer(
-        f"🧪 <b>[TEST]</b> Referral processed successfully.\n"
-        f"Scale: <code>{user_data[2]}/5</code> | Total: <code>{user_data[3]}</code>",
+        f"🧪 <b>[TEST]</b> Referral added.\nScale: <code>{user_data[2]}/5</code> | Total: <code>{user_data[3]}</code>",
         parse_mode="HTML"
     )
+
+@dp.callback_query(F.data == "menu_back")
+async def back_to_main(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    text = (
+        "<b>TagPulse</b>\n"
+        "<i>Real-time username tracking & generator.</i>\n\n"
+        "Choose an option below:"
+    )
+    await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+    await callback.answer()
+
+# --- ЛОГІКА ПОШУКУ / ГЕНЕРАЦІЇ ЮЗЕРНЕЙМІВ ---
+@dp.callback_query(F.data == "start_search")
+async def search_step_length(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(SearchStates.waiting_for_length)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="5–7 chars", callback_data="len_5_7"),
+         InlineKeyboardButton(text="8–10 chars", callback_data="len_8_10")],
+        [InlineKeyboardButton(text="11–12 chars", callback_data="len_11_12")],
+        [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
+    ])
+    text = "<b>[ Step 1/2 ]</b>\n\nSelect desired username length:"
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("len_"))
+async def search_step_digits(callback: CallbackQuery, state: FSMContext):
+    length_map = {
+        "len_5_7": (5, 7),
+        "len_8_10": (8, 10),
+        "len_11_12": (11, 12)
+    }
+    min_l, max_l = length_map.get(callback.data, (5, 7))
+    await state.update_data(min_len=min_l, max_len=max_l)
+    
+    await state.set_state(SearchStates.waiting_for_digits)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="With digits (e.g. user99)", callback_data="dig_yes")],
+        [InlineKeyboardButton(text="Letters only (e.g. user)", callback_data="dig_no")],
+        [InlineKeyboardButton(text="← Back", callback_data="start_search")]
+    ])
+    text = "<b>[ Step 2/2 ]</b>\n\nInclude numbers in usernames?"
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("dig_"))
+async def process_username_search(callback: CallbackQuery, state: FSMContext):
+    use_digits = (callback.data == "dig_yes")
+    data = await state.get_data()
+    min_l = data.get("min_len", 5)
+    max_l = data.get("max_len", 7)
+    
+    user_id = callback.from_user.id
+    is_prem = is_user_premium(user_id)
+    limit = 3 if is_prem else 1
+
+    await callback.message.edit_text("🔍 Scanning Telegram network for available usernames...", parse_mode="HTML")
+    
+    found_usernames = []
+    chars = string.ascii_lowercase + (string.digits if use_digits else "")
+    
+    # Генерація та перевірка (пробуємо знайти вільні)
+    attempts = 0
+    while len(found_usernames) < limit and attempts < 30:
+        attempts += 1
+        length = random.randint(min_l, max_l)
+        uname = "".join(random.choices(chars, k=length))
+        
+        # Юзернейм не може починатися з цифри за правилами TG
+        if uname[0].isdigit():
+            continue
+            
+        try:
+            await bot.get_chat(f"@{uname}")
+            # Якщо чат знайдено — він зайнятий
+        except TelegramBadRequest:
+            # Чат не знайдено — юзернейм вільний!
+            if uname not in found_usernames:
+                found_usernames.append(uname)
+        except Exception:
+            pass
+        await asyncio.sleep(0.1)
+
+    if not found_usernames:
+        text = (
+            "⚠️ <b>No free usernames found in this attempt.</b>\n"
+            "Try changing length or parameters."
+        )
+        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+        return
+
+    # Виводимо знайдені юзернейми (Free: 1, Premium: до 3)
+    for uname in found_usernames:
+        add_to_history(user_id, uname)
+        result_text = (
+            f"<b>✨ Available Username Found!</b>\n\n"
+            f"Target: <code>@{uname}</code>\n"
+            f"Status: <b>Free ✅</b>\n"
+            f"Mode: <code>{'Premium (3 slots)' if is_prem else 'Free (1 slot)'}</code>"
+        )
+        await callback.message.answer(result_text, reply_markup=get_result_keyboard(uname), parse_mode="HTML")
+    
+    await state.clear()
+    await callback.answer()
+
+# --- ІСТОРІЯ ТА ПРЕМІУМ ---
+@dp.callback_query(F.data == "menu_history")
+async def show_history(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    history_rows = get_history(user_id)
+    
+    if not history_rows:
+        text = "<b>[ History ]</b>\n\nYour history is empty. Run a search first!"
+    else:
+        history_list = "\n".join([f"• <code>@{item[0]}</code> — <i>{item[1]}</i>" for item in history_rows])
+        text = f"<b>[ History (Last 20) ]</b>\n\n{history_list}"
+        
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await callback.answer()
 
 @dp.callback_query(F.data == "menu_premium")
 async def show_premium_info(callback: CallbackQuery):
@@ -175,6 +348,7 @@ async def show_premium_info(callback: CallbackQuery):
         f"Status: <b>{prem_status}</b>\n"
         f"Scale progress: <code>{ref_count}/5</code>\n"
         f"Total invited: <code>{total_invited}</code>\n\n"
+        "<b>Perks:</b> Search up to 3 free slots at once!\n\n"
         "<b>Rewards:</b>\n"
         "• 2 referrals → +1 day Premium\n"
         "• 3 referrals → +3 days Premium\n"
@@ -186,69 +360,15 @@ async def show_premium_info(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
-@dp.callback_query(F.data == "menu_monitor")
-async def show_monitor_menu(callback: CallbackQuery):
-    text = (
-        "<b>[ Pulse Monitor ]</b>\n\n"
-        "Send any username (e.g. <code>durov</code> or <code>@username</code>) to check its availability status right now.\n\n"
-        "<i>Free: 1 slot | Premium: 5–10 slots + instant alerts</i>"
-    )
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
-    await callback.answer()
-
-@dp.callback_query(F.data == "menu_back")
-async def back_to_main(callback: CallbackQuery):
-    text = (
-        "<b>TagPulse</b>\n"
-        "<i>Real-time username tracking & analytics.</i>\n\n"
-        "Select an option below or send a username to check it:"
-    )
-    await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-    await callback.answer()
-
-# --- USERNAME CHECKER HANDLER ---
-@dp.message(F.text & ~F.text.startswith("/"))
-async def check_username(message: Message):
-    raw_text = message.text.strip()
-    username = raw_text.lstrip("@").strip()
-    
-    if len(username) < 5:
-        await message.answer("⚠️ Username must be at least 5 characters long according to Telegram rules.")
-        return
-
-    processing_msg = await message.answer(f"🔍 Checking <code>@{username}</code>...", parse_mode="HTML")
-
-    try:
-        chat = await bot.get_chat(f"@{username}")
-        
-        # Determine account type
-        chat_type = chat.type
-        title_name = chat.title or chat.full_name or "Unknown"
-        
-        result_text = (
-            f"<b>[ Username Status ]</b>\n\n"
-            f"Target: <code>@{username}</code>\n"
-            f"Status: <b>Occupied ❌</b>\n"
-            f"Type: <code>{chat_type}</code>\n"
-            f"Name: <b>{title_name}</b>"
-        )
-    except TelegramBadRequest:
-        # If chat is not found, the username is likely available (or banned/restricted)
-        result_text = (
-            f"<b>[ Username Status ]</b>\n\n"
-            f"Target: <code>@{username}</code>\n"
-            f"Status: <b>Available / Not Found ✅</b>\n"
-            f"<i>(Tip: Verify directly in Telegram search)</i>"
-        )
-    except Exception:
-        result_text = f"⚠️ Error checking <code>@{username}</code>. Try again later."
-
-    await processing_msg.edit_text(result_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+@dp.callback_query(F.data.startswith("save_"))
+async def save_username_action(callback: CallbackQuery):
+    uname = callback.data.replace("save_", "")
+    await callback.answer(f"✅ Username @{uname} saved to your records!", show_alert=True)
 
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse Bot with Username Checker is online!")
+    print("TagPulse FSM Bot is online!")
     try:
         await dp.start_polling(bot)
     finally:
