@@ -14,7 +14,10 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.exceptions import TelegramBadRequest
 
 TOKEN = os.getenv("BOT_TOKEN")
-TEST_ADMIN_ID = 5619415334  # Заміни на свій ID для /addref
+
+# 👇 Твій ID (головний розробник) та ID твого помічника (тестувальник)
+OWNER_ID = 5619415334       # Заміни на свій Telegram ID
+TESTER_ID = 8644168067      # Заміни на Telegram ID помічника
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -69,6 +72,8 @@ def add_user(user_id: int, referrer_id: int = None):
     conn.close()
 
 def is_user_premium(user_id: int) -> bool:
+    if user_id in (OWNER_ID, TESTER_ID):
+        return True  # Власник та тестувальник завжди мають преміум для перевірки генерації на 3 слоти
     user = get_user(user_id)
     if not user or not user[4]:
         return False
@@ -83,7 +88,6 @@ def add_to_history(user_id: int, username: str):
     cursor = conn.cursor()
     cursor.execute("INSERT INTO history (user_id, username, created_at) VALUES (?, ?, ?)", 
                    (user_id, username, datetime.datetime.now().strftime("%d.%m %H:%M")))
-    # Обмежуємо історію до 20 записів
     cursor.execute("""
         DELETE FROM history WHERE id NOT IN (
             SELECT id FROM history WHERE user_id = ? ORDER BY id DESC LIMIT 20
@@ -146,20 +150,28 @@ def update_referral_progress(referrer_id: int):
     conn.close()
 
 # --- КЛАВІАТУРИ ---
-def get_main_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
+def get_main_keyboard(user_id: int):
+    keyboard = [
         [InlineKeyboardButton(text="🔍 Search Generator", callback_data="start_search")],
         [InlineKeyboardButton(text="⚡ Check Specific Tag", callback_data="start_check")],
         [InlineKeyboardButton(text="📜 History", callback_data="menu_history"),
          InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium")]
-    ])
+    ]
+    
+    # Меню тестувальника доступне тільки для тейстера або тебе
+    if user_id == TESTER_ID:
+        keyboard.append([InlineKeyboardButton(text="🧪 Tester Menu", callback_data="tester_menu")])
+    elif user_id == OWNER_ID:
+        keyboard.append([InlineKeyboardButton(text="👑 Owner Menu", callback_data="tester_menu")])
+        
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def get_back_keyboard():
+def get_back_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
 
-def get_result_keyboard(username: str):
+def get_result_keyboard(username: str, user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Share Link", url=f"https://t.me/{username}")],
         [InlineKeyboardButton(text="💾 Save", callback_data=f"save_{username}")],
@@ -167,7 +179,7 @@ def get_result_keyboard(username: str):
         [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
 
-# --- ХЕНДЛЕРИ ГОЛОВНОГО МЕНЮ ---
+# --- ГОЛОВНЕ МЕНЮ ---
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
@@ -189,41 +201,76 @@ async def cmd_start(message: Message, state: FSMContext):
         if referrer_id:
             update_referral_progress(referrer_id)
 
+    badge = ""
+    if user_id == TESTER_ID:
+        badge = " <i>[🧪 Tester Mode]</i>"
+    elif user_id == OWNER_ID:
+        badge = " <i>[👑 Owner Mode]</i>"
+
     text = (
-        "<b>TagPulse</b>\n"
+        f"<b>TagPulse</b>{badge}\n"
         "<i>Real-time username tracking & generator.</i>\n\n"
         "Choose an option below:"
     )
-    await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-
-@dp.message(Command("addref"))
-async def test_add_referral(message: Message):
-    if message.from_user.id != TEST_ADMIN_ID:
-        return
-    if not get_user(message.from_user.id):
-        add_user(message.from_user.id)
-    update_referral_progress(message.from_user.id)
-    user_data = get_user(message.from_user.id)
-    await message.answer(
-        f"🧪 <b>[TEST]</b> Referral added.\nScale: <code>{user_data[2]}/5</code> | Total: <code>{user_data[3]}</code>",
-        parse_mode="HTML"
-    )
+    await message.answer(text, reply_markup=get_main_keyboard(user_id), parse_mode="HTML")
 
 @dp.callback_query(F.data == "menu_back")
 async def back_to_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
+    user_id = callback.from_user.id
+    badge = ""
+    if user_id == TESTER_ID:
+        badge = " <i>[🧪 Tester Mode]</i>"
+    elif user_id == OWNER_ID:
+        badge = " <i>[👑 Owner Mode]</i>"
+
     text = (
-        "<b>TagPulse</b>\n"
+        f"<b>TagPulse</b>{badge}\n"
         "<i>Real-time username tracking & generator.</i>\n\n"
         "Choose an option below:"
     )
-    await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(text, reply_markup=get_main_keyboard(user_id), parse_mode="HTML")
     await callback.answer()
 
-# --- ГЕНЕРАТОР ЮЗЕРНЕЙМІВ ---
+# --- МЕНЮ ТЕСТУВАЛЬНИКА ---
+@dp.callback_query(F.data == "tester_menu")
+async def tester_menu(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    if user_id not in (OWNER_ID, TESTER_ID):
+        await callback.answer("⛔ Access denied.", show_alert=True)
+        return
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⚡ Toggle / Refresh Test Premium", callback_data="test_add_prem")],
+        [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
+    ])
+    text = (
+        "<b>🧪 Tester Panel</b>\n\n"
+        "Here you can quickly test features and activate a 7-day test premium to check multi-slot generation."
+    )
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "test_add_prem")
+async def test_add_prem(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    if user_id not in (OWNER_ID, TESTER_ID):
+        return
+    
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    new_prem = (datetime.datetime.now() + datetime.timedelta(days=7)).isoformat()
+    cursor.execute("UPDATE users SET premium_until = ? WHERE user_id = ?", (new_prem, user_id))
+    conn.commit()
+    conn.close()
+    
+    await callback.answer("✅ Test Premium successfully activated for 7 days!", show_alert=True)
+
+# --- ГЕНЕРАТОР ТА ПОШУК ---
 @dp.callback_query(F.data == "start_search")
 async def search_step_length(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SearchStates.waiting_for_length)
+    user_id = callback.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="5–7 chars", callback_data="len_5_7"),
          InlineKeyboardButton(text="8–10 chars", callback_data="len_8_10")],
@@ -289,11 +336,8 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
         await asyncio.sleep(0.05)
 
     if not found_usernames:
-        text = (
-            "⚠️ <b>No free usernames found in this attempt.</b>\n"
-            "Try changing length or parameters."
-        )
-        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+        text = "⚠️ <b>No free usernames found in this attempt.</b>\nTry changing length or parameters."
+        await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
         return
 
     for uname in found_usernames:
@@ -302,22 +346,23 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
             f"<b>✨ Available Username Found!</b>\n\n"
             f"Target: <code>@{uname}</code>\n"
             f"Status: <b>Free ✅</b>\n"
-            f"Mode: <code>{'Premium (3 slots)' if is_prem else 'Free (1 slot)'}</code>"
+            f"Mode: <code>{'Premium / Tester (3 slots)' if is_prem else 'Free (1 slot)'}</code>"
         )
-        await callback.message.answer(result_text, reply_markup=get_result_keyboard(uname), parse_mode="HTML")
+        await callback.message.answer(result_text, reply_markup=get_result_keyboard(uname, user_id), parse_mode="HTML")
     
     await state.clear()
     await callback.answer()
 
-# --- ПРЯМА ПЕРЕВІРКА ВЛАСНОГО ЮЗЕРА ---
+# --- ПРЯМА ПЕРЕВІРКА ---
 @dp.callback_query(F.data == "start_check")
 async def start_custom_check(callback: CallbackQuery, state: FSMContext):
     await state.set_state(CheckStates.waiting_for_username)
+    user_id = callback.from_user.id
     text = (
         "<b>[ Direct Username Check ]</b>\n\n"
         "Send the username you want to check (e.g., <code>durov</code> or <code>@telegram</code>):"
     )
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
     await callback.answer()
 
 @dp.message(CheckStates.waiting_for_username, F.text)
@@ -354,7 +399,7 @@ async def process_custom_check(message: Message, state: FSMContext):
     except Exception:
         result_text = f"⚠️ Error checking <code>@{username}</code>. Try again later."
 
-    await processing_msg.edit_text(result_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await processing_msg.edit_text(result_text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
     await state.clear()
 
 # --- ІСТОРІЯ ТА ПРЕМІУМ ---
@@ -369,7 +414,7 @@ async def show_history(callback: CallbackQuery):
         history_list = "\n".join([f"• <code>@{item[0]}</code> — <i>{item[1]}</i>" for item in history_rows])
         text = f"<b>[ History (Last 20) ]</b>\n\n{history_list}"
         
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_premium")
@@ -382,7 +427,9 @@ async def show_premium_info(callback: CallbackQuery):
     prem_until_str = user_data[4] if user_data else None
     
     prem_status = "Inactive ❌"
-    if prem_until_str:
+    if user_id in (OWNER_ID, TESTER_ID):
+        prem_status = "Active (Tester / Owner 🧪) ✅"
+    elif prem_until_str:
         prem_date = datetime.datetime.fromisoformat(prem_until_str)
         if prem_date > datetime.datetime.now():
             prem_status = f"Active until {prem_date.strftime('%d.%m %H:%M')} ✅"
@@ -404,7 +451,7 @@ async def show_premium_info(callback: CallbackQuery):
         f"<code>{ref_link}</code>"
     )
     
-    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("save_"))
@@ -415,7 +462,7 @@ async def save_username_action(callback: CallbackQuery):
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse Advanced Bot is online!")
+    print("TagPulse Tester Edition is online!")
     try:
         await dp.start_polling(bot)
     finally:
