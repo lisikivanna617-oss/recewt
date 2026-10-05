@@ -14,7 +14,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.exceptions import TelegramBadRequest
 
 TOKEN = os.getenv("BOT_TOKEN")
-TEST_ADMIN_ID = 123456789  # Заміни на свій ID для /addref
+TEST_ADMIN_ID = 5619415334  # Заміни на свій ID для /addref
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
