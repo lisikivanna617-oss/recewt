@@ -158,7 +158,6 @@ def get_main_keyboard(user_id: int):
          InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium")]
     ]
     
-    # Меню тестувальника доступне тільки для тейстера або тебе
     if user_id == TESTER_ID:
         keyboard.append([InlineKeyboardButton(text="🧪 Tester Menu", callback_data="tester_menu")])
     elif user_id == OWNER_ID:
@@ -168,14 +167,6 @@ def get_main_keyboard(user_id: int):
 
 def get_back_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
-    ])
-
-def get_result_keyboard(username: str, user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📤 Share Link", url=f"https://t.me/{username}")],
-        [InlineKeyboardButton(text="💾 Save", callback_data=f"save_{username}")],
-        [InlineKeyboardButton(text="🔄 Repeat Search", callback_data="start_search")],
         [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
 
@@ -266,30 +257,33 @@ async def test_add_prem(callback: CallbackQuery):
     
     await callback.answer("✅ Test Premium successfully activated for 7 days!", show_alert=True)
 
-# --- ГЕНЕРАТОР ТА ПОШУК ---
+# --- ГЕНЕРАТОР ТА ПОШУК (ВИБІР ТОЧНОЇ ДОВЖИНИ) ---
 @dp.callback_query(F.data == "start_search")
 async def search_step_length(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SearchStates.waiting_for_length)
     user_id = callback.from_user.id
+    
+    # Кнопки вибору конкретної довжини від 4 до 12 символів
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="5–7 chars", callback_data="len_5_7"),
-         InlineKeyboardButton(text="8–10 chars", callback_data="len_8_10")],
-        [InlineKeyboardButton(text="11–12 chars", callback_data="len_11_12")],
+        [InlineKeyboardButton(text="4", callback_data="len_4"),
+         InlineKeyboardButton(text="5", callback_data="len_5"),
+         InlineKeyboardButton(text="6", callback_data="len_6")],
+        [InlineKeyboardButton(text="7", callback_data="len_7"),
+         InlineKeyboardButton(text="8", callback_data="len_8"),
+         InlineKeyboardButton(text="9", callback_data="len_9")],
+        [InlineKeyboardButton(text="10", callback_data="len_10"),
+         InlineKeyboardButton(text="11", callback_data="len_11"),
+         InlineKeyboardButton(text="12", callback_data="len_12")],
         [InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")]
     ])
-    text = "<b>[ Step 1/2 ]</b>\n\nSelect desired username length:"
+    text = "<b>[ Step 1/2 ]</b>\n\nSelect exact username length:"
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("len_"))
 async def search_step_digits(callback: CallbackQuery, state: FSMContext):
-    length_map = {
-        "len_5_7": (5, 7),
-        "len_8_10": (8, 10),
-        "len_11_12": (11, 12)
-    }
-    min_l, max_l = length_map.get(callback.data, (5, 7))
-    await state.update_data(min_len=min_l, max_len=max_l)
+    length = int(callback.data.replace("len_", ""))
+    await state.update_data(exact_len=length)
     
     await state.set_state(SearchStates.waiting_for_digits)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -297,7 +291,7 @@ async def search_step_digits(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Letters only (e.g. user)", callback_data="dig_no")],
         [InlineKeyboardButton(text="← Back", callback_data="start_search")]
     ])
-    text = "<b>[ Step 2/2 ]</b>\n\nInclude numbers in usernames?"
+    text = f"<b>[ Step 2/2 ]</b>\n\nLength: <b>{length} chars</b>.\nInclude numbers in usernames?"
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 
@@ -305,8 +299,7 @@ async def search_step_digits(callback: CallbackQuery, state: FSMContext):
 async def process_username_search(callback: CallbackQuery, state: FSMContext):
     use_digits = (callback.data == "dig_yes")
     data = await state.get_data()
-    min_l = data.get("min_len", 5)
-    max_l = data.get("max_len", 7)
+    length = data.get("exact_len", 5)
     
     user_id = callback.from_user.id
     is_prem = is_user_premium(user_id)
@@ -318,9 +311,8 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
     chars = string.ascii_lowercase + (string.digits if use_digits else "")
     
     attempts = 0
-    while len(found_usernames) < limit and attempts < 35:
+    while len(found_usernames) < limit and attempts < 45:
         attempts += 1
-        length = random.randint(min_l, max_l)
         uname = "".join(random.choices(chars, k=length))
         
         if uname[0].isdigit():
@@ -340,16 +332,30 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
         return
 
+    # Формуємо єдине повідомлення зі списком усіх знайдених тегів
+    result_lines = []
+    keyboard_buttons = []
+    
     for uname in found_usernames:
         add_to_history(user_id, uname)
-        result_text = (
-            f"<b>✨ Available Username Found!</b>\n\n"
-            f"Target: <code>@{uname}</code>\n"
-            f"Status: <b>Free ✅</b>\n"
-            f"Mode: <code>{'Premium / Tester (3 slots)' if is_prem else 'Free (1 slot)'}</code>"
-        )
-        await callback.message.answer(result_text, reply_markup=get_result_keyboard(uname, user_id), parse_mode="HTML")
+        result_lines.append(f"• <code>@{uname}</code> — <b>Free ✅</b>")
+        keyboard_buttons.append([InlineKeyboardButton(text=f"📤 Share @{uname}", url=f"https://t.me/{uname}")])
+
+    usernames_joined = "\n".join(result_lines)
+    mode_text = 'Premium / Tester (3 slots)' if is_prem else 'Free (1 slot)'
     
+    result_text = (
+        f"<b>✨ Available Username(s) Found!</b>\n\n"
+        f"{usernames_joined}\n\n"
+        f"Mode: <code>{mode_text}</code>"
+    )
+
+    keyboard_buttons.append([InlineKeyboardButton(text="🔄 Repeat Search", callback_data="start_search")])
+    keyboard_buttons.append([InlineKeyboardButton(text="← Main Menu", callback_data="menu_back")])
+    
+    result_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+    await callback.message.edit_text(result_text, reply_markup=result_keyboard, parse_mode="HTML")
     await state.clear()
     await callback.answer()
 
@@ -454,15 +460,10 @@ async def show_premium_info(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(user_id), parse_mode="HTML")
     await callback.answer()
 
-@dp.callback_query(F.data.startswith("save_"))
-async def save_username_action(callback: CallbackQuery):
-    uname = callback.data.replace("save_", "")
-    await callback.answer(f"✅ Username @{uname} saved to your records!", show_alert=True)
-
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse Tester Edition is online!")
+    print("TagPulse Bot is online and updated!")
     try:
         await dp.start_polling(bot)
     finally:
