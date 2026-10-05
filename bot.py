@@ -277,7 +277,6 @@ async def search_step_length(callback: CallbackQuery, state: FSMContext):
     
     # Кнопки вибору конкретної довжини від 4 до 12 символів
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="4", callback_data="len_4"),
          InlineKeyboardButton(text="5", callback_data="len_5"),
          InlineKeyboardButton(text="6", callback_data="len_6")],
         [InlineKeyboardButton(text="7", callback_data="len_7"),
