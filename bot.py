@@ -95,9 +95,20 @@ async def is_user_banned(user_id: int) -> bool:
 
 async def check_telegram_username(username: str) -> bool:
     username = username.lstrip("@").strip()
-    url = f"https://t.me/{username}"
-    
     if len(username) < 5:
+        return False
+
+    try:
+        # Намагаємося отримати інформацію про чат/юзера через Telegram Bot API
+        await bot.get_chat(f"@{username}")
+        # Якщо чат знайдено — юзернейм ЗАЙНЯТИЙ
+        return False
+    except Exception as e:
+        err_msg = str(e).lower()
+        # Якщо Telegram відповідає, що чат не знайдено — юзернейм ВІЛЬНИЙ
+        if "chat not found" in err_msg or "user not found" in err_msg:
+            return True
+        # У разі інших помилок (наприклад, суворий флуд-контроль)
         return False
 
     headers = {
@@ -314,14 +325,11 @@ async def cb_process_generate(callback: CallbackQuery):
     is_premium = "PREMIUM" in plan
     target_count = 3 if is_premium else 1
 
-    await callback.answer("⚡ Searching with priority speed..." if is_premium else "Searching...", show_alert=False)
+    await callback.answer("⚡ Searching for available tags...", show_alert=False)
 
     found_results = []
     attempts = 0
-    max_attempts = 40
-
-    # 🔥 ЧЕСНЕ ПРИСКОРЕННЯ 2.5x ДЛЯ PREMIUM
-    sleep_interval = 0.06 if is_premium else 0.15
+    max_attempts = 25  # Ліміт перевірок за один клік, щоб бот не зависав
 
     async with aiosqlite.connect(DB_PATH) as db:
         while len(found_results) < target_count and attempts < max_attempts:
@@ -336,7 +344,8 @@ async def cb_process_generate(callback: CallbackQuery):
                 await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (user_id, tag))
                 found_results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
             
-            await asyncio.sleep(sleep_interval)
+            # Мікро-пауза, щоб Telegram не дав FloodWait
+            await asyncio.sleep(0.1 if is_premium else 0.25)
             
         await db.commit()
 
@@ -345,7 +354,7 @@ async def cb_process_generate(callback: CallbackQuery):
         body = "\n".join(found_results)
     else:
         header = "<b>🔎 Search Results:</b>\n\n"
-        body = "❌ No available tags found in this attempt. Try again!"
+        body = f"❌ Checked {attempts} generated tags, but none were free this time. Click below to try again!"
 
     if not is_premium:
         body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for 2.5x faster search & 3 tags per click!</i>"
