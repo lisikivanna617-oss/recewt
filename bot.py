@@ -4,6 +4,8 @@ import logging
 import asyncio
 import datetime
 import threading
+import random
+import string
 import aiosqlite
 import requests
 from flask import Flask
@@ -19,8 +21,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "123456789"))
-TESTER_ID = int(os.environ.get("TESTER_ID", "123456789"))
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "5619415334"))
+TESTER_ID = int(os.environ.get("TESTER_ID", "8644168067"))
 DB_PATH = "bot_database.db"
 
 bot = Bot(token=BOT_TOKEN)
@@ -39,7 +41,6 @@ def run_web():
 
 # --- FSM States ---
 class Form(StatesGroup):
-    waiting_for_tag_search = State()
     waiting_for_snipe_tag = State()
     waiting_for_admin_give_perm = State()
 
@@ -94,7 +95,19 @@ async def check_telegram_username(username: str) -> bool:
         logger.error(f"Error checking username {username}: {e}")
         return False
 
+def generate_username(length: int, include_numbers: bool) -> str:
+    chars = string.ascii_lowercase
+    if include_numbers:
+        chars += string.digits
+    # Telegram юзернейм повинен починатися з букви
+    first_char = random.choice(string.ascii_lowercase)
+    rest_chars = ''.join(random.choice(chars) for _ in range(length - 1))
+    return first_char + rest_chars
+
 async def get_user_plan(user_id: int) -> str:
+    if user_id in (ADMIN_ID, TESTER_ID):
+        return "PREMIUM (Staff)"
+
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT plan, premium_until FROM users WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
@@ -111,8 +124,8 @@ async def get_user_plan(user_id: int) -> str:
 
 def get_main_keyboard(user_id: int, plan: str):
     buttons = [
-        [InlineKeyboardButton(text="🔍 Search Username", callback_data="menu_search")],
-        [InlineKeyboardButton(text="🎯 Username Sniper", callback_data="menu_sniper")],
+        [InlineKeyboardButton(text="🔍 Generator & Search", callback_data="menu_search_gen")],
+        [InlineKeyboardButton(text="🎯 Username Sniper (PREMIUM)", callback_data="menu_sniper")],
         [InlineKeyboardButton(text="🏷 My Tags", callback_data="menu_tags")],
         [InlineKeyboardButton(text="⭐ Premium & Referrals", callback_data="menu_premium")]
     ]
@@ -172,22 +185,33 @@ async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
     )
     await callback.message.edit_text(text, reply_markup=get_main_keyboard(callback.from_user.id, plan), parse_mode="HTML")
     await callback.answer()
-# --- Handlers: Search & Sniper ---
+# --- Handlers: Search Generator ---
 
-@dp.callback_query(F.data == "menu_search")
-async def cb_menu_search(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(Form.waiting_for_tag_search)
-    await callback.message.edit_text(
-        "🔍 Send me the username/tag you want to check (e.g. <code>@tag</code> or <code>tag</code>):",
-        reply_markup=get_back_keyboard(),
-        parse_mode="HTML"
-    )
+@dp.callback_query(F.data == "menu_search_gen")
+async def cb_menu_search_gen(callback: CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔤 5 chars (Letters only)", callback_data="gen_5_alpha"),
+         InlineKeyboardButton(text="🔢 5 chars (Letters+Digits)", callback_data="gen_5_alnum")],
+        [InlineKeyboardButton(text="🔤 6 chars (Letters only)", callback_data="gen_6_alpha"),
+         InlineKeyboardButton(text="🔢 6 chars (Letters+Digits)", callback_data="gen_6_alnum")],
+        [InlineKeyboardButton(text="🔤 7 chars (Letters only)", callback_data="gen_7_alpha"),
+         InlineKeyboardButton(text="🔢 7 chars (Letters+Digits)", callback_data="gen_7_alnum")],
+        [InlineKeyboardButton(text="🔤 8 chars (Letters only)", callback_data="gen_8_alpha"),
+         InlineKeyboardButton(text="🔢 8 chars (Letters+Digits)", callback_data="gen_8_alnum")],
+        [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
+    ])
+    text = "<b>🎲 Select username length and format to generate & check:</b>"
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
 
-@dp.message(Form.waiting_for_tag_search)
-async def process_tag_search(message: Message, state: FSMContext):
-    tag = message.text.strip().lstrip("@")
-    await message.answer(f"🔎 Checking status for <code>@{tag}</code>...", parse_mode="HTML")
+@dp.callback_query(F.data.startswith("gen_"))
+async def cb_process_generate(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    length = int(parts[1])
+    include_nums = (parts[2] == "alnum")
+
+    tag = generate_username(length, include_nums)
+    await callback.answer(f"Checking @{tag}...", show_alert=False)
 
     is_free = await check_telegram_username(tag)
 
@@ -195,22 +219,34 @@ async def process_tag_search(message: Message, state: FSMContext):
         await db.execute("UPDATE stats SET total_searches = total_searches + 1 WHERE id = 1")
         if is_free:
             await db.execute("UPDATE stats SET found_usernames = found_usernames + 1 WHERE id = 1")
-            await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (message.from_user.id, tag))
+            await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (callback.from_user.id, tag))
         await db.commit()
 
     if is_free:
-        res = f"✅ <b>Username @{tag} is AVAILABLE!</b>"
+        status_text = f"✅ <b>Generated Username @{tag} is AVAILABLE!</b>\nSaved to your /tags list."
     else:
-        res = f"❌ <b>Username @{tag} is TAKEN or UNAVAILABLE.</b>"
+        status_text = f"❌ <b>Generated Username @{tag} is TAKEN.</b>"
 
-    await message.answer(res, reply_markup=get_back_keyboard(), parse_mode="HTML")
-    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Try Again", callback_data=callback.data)],
+        [InlineKeyboardButton(text="⚙️ Change Options", callback_data="menu_search_gen")],
+        [InlineKeyboardButton(text="⬅️ Back to Menu", callback_data="main_menu")]
+    ])
+
+    await callback.message.edit_text(status_text, reply_markup=kb, parse_mode="HTML")
+
+# --- Handlers: Sniper (Premium Only) ---
 
 @dp.callback_query(F.data == "menu_sniper")
 async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
+    plan = await get_user_plan(callback.from_user.id)
+    if "PREMIUM" not in plan:
+        await callback.answer("🔒 Sniper is for PREMIUM users only! Invite 3 friends to get Premium.", show_alert=True)
+        return
+
     await state.set_state(Form.waiting_for_snipe_tag)
     await callback.message.edit_text(
-        "🎯 <b>Username Sniper</b>\n\nSend me the username you want to monitor:",
+        "🎯 <b>Username Sniper (Premium)</b>\n\nSend me the username you want to monitor:",
         reply_markup=get_back_keyboard(),
         parse_mode="HTML"
     )
@@ -218,6 +254,12 @@ async def cb_menu_sniper(callback: CallbackQuery, state: FSMContext):
 
 @dp.message(Form.waiting_for_snipe_tag)
 async def process_snipe_tag(message: Message, state: FSMContext):
+    plan = await get_user_plan(message.from_user.id)
+    if "PREMIUM" not in plan:
+        await message.answer("🔒 Premium required for Sniper.", reply_markup=get_back_keyboard())
+        await state.clear()
+        return
+
     tag = message.text.strip().lstrip("@")
     
     async with aiosqlite.connect(DB_PATH) as db:
@@ -360,7 +402,7 @@ async def cb_tester_panel(callback: CallbackQuery):
     text = "<b>🧪 Tester Panel</b>\nChoose a test function:"
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔔 Test Notification", callback_data="test_notify")],
-        [InlineKeyboardButton(text="⬅️️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton(text="⬅️ Back", callback_data="main_menu")]
     ])
 
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
