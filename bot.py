@@ -17,16 +17,14 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- Configuration & Logging ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "5619415334"))
 TESTER_ID = int(os.environ.get("TESTER_ID", "8644168067"))
 DB_PATH = "bot_database.db"
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+# 👇 ДОДАЙ ЦІ ДВА РЯДКИ СЮДИ:
+CHANNEL_ID = os.environ.get("CHANNEL_ID", "@otxen")  # Юзернейм каналу з @
+CHANNEL_URL = "https://t.me/otxen"                   # Пряме посилання
 
 # --- Web Server ---
 web_app = Flask(__name__)
