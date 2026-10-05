@@ -26,7 +26,7 @@ TESTER_ID = int(os.environ.get("TESTER_ID", "8644168067"))
 DB_PATH = "bot_database.db"
 
 # --- Channel Configuration ---
-CHANNEL_ID = -1003979599792
+CHANNEL_ID = @otxen
 CHANNEL_URL = "https://t.me/otxen"
 
 bot = Bot(token=BOT_TOKEN)
