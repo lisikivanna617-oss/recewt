@@ -14,7 +14,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.exceptions import TelegramBadRequest
 
 TOKEN = os.getenv("BOT_TOKEN")
-TEST_ADMIN_ID = 5619415334  # Заміни на свій ID для /addref
+TEST_ADMIN_ID = 123456789  # Заміни на свій ID для /addref
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -23,6 +23,9 @@ dp = Dispatcher()
 class SearchStates(StatesGroup):
     waiting_for_length = State()
     waiting_for_digits = State()
+
+class CheckStates(StatesGroup):
+    waiting_for_username = State()
 
 # --- БАЗА ДАНИХ (SQLite) ---
 def init_db():
@@ -80,7 +83,7 @@ def add_to_history(user_id: int, username: str):
     cursor = conn.cursor()
     cursor.execute("INSERT INTO history (user_id, username, created_at) VALUES (?, ?, ?)", 
                    (user_id, username, datetime.datetime.now().strftime("%d.%m %H:%M")))
-    # Обмежуємо історію до 20 записів на користувача
+    # Обмежуємо історію до 20 записів
     cursor.execute("""
         DELETE FROM history WHERE id NOT IN (
             SELECT id FROM history WHERE user_id = ? ORDER BY id DESC LIMIT 20
@@ -145,7 +148,8 @@ def update_referral_progress(referrer_id: int):
 # --- КЛАВІАТУРИ ---
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔍 Start Search", callback_data="start_search")],
+        [InlineKeyboardButton(text="🔍 Search Generator", callback_data="start_search")],
+        [InlineKeyboardButton(text="⚡ Check Specific Tag", callback_data="start_check")],
         [InlineKeyboardButton(text="📜 History", callback_data="menu_history"),
          InlineKeyboardButton(text="💎 Premium", callback_data="menu_premium")]
     ])
@@ -216,7 +220,7 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
     await callback.answer()
 
-# --- ЛОГІКА ПОШУКУ / ГЕНЕРАЦІЇ ЮЗЕРНЕЙМІВ ---
+# --- ГЕНЕРАТОР ЮЗЕРНЕЙМІВ ---
 @dp.callback_query(F.data == "start_search")
 async def search_step_length(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SearchStates.waiting_for_length)
@@ -266,27 +270,23 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
     found_usernames = []
     chars = string.ascii_lowercase + (string.digits if use_digits else "")
     
-    # Генерація та перевірка (пробуємо знайти вільні)
     attempts = 0
-    while len(found_usernames) < limit and attempts < 30:
+    while len(found_usernames) < limit and attempts < 35:
         attempts += 1
         length = random.randint(min_l, max_l)
         uname = "".join(random.choices(chars, k=length))
         
-        # Юзернейм не може починатися з цифри за правилами TG
         if uname[0].isdigit():
             continue
             
         try:
             await bot.get_chat(f"@{uname}")
-            # Якщо чат знайдено — він зайнятий
         except TelegramBadRequest:
-            # Чат не знайдено — юзернейм вільний!
             if uname not in found_usernames:
                 found_usernames.append(uname)
         except Exception:
             pass
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.05)
 
     if not found_usernames:
         text = (
@@ -296,7 +296,6 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
-    # Виводимо знайдені юзернейми (Free: 1, Premium: до 3)
     for uname in found_usernames:
         add_to_history(user_id, uname)
         result_text = (
@@ -309,6 +308,54 @@ async def process_username_search(callback: CallbackQuery, state: FSMContext):
     
     await state.clear()
     await callback.answer()
+
+# --- ПРЯМА ПЕРЕВІРКА ВЛАСНОГО ЮЗЕРА ---
+@dp.callback_query(F.data == "start_check")
+async def start_custom_check(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(CheckStates.waiting_for_username)
+    text = (
+        "<b>[ Direct Username Check ]</b>\n\n"
+        "Send the username you want to check (e.g., <code>durov</code> or <code>@telegram</code>):"
+    )
+    await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await callback.answer()
+
+@dp.message(CheckStates.waiting_for_username, F.text)
+async def process_custom_check(message: Message, state: FSMContext):
+    raw_text = message.text.strip()
+    username = raw_text.lstrip("@").strip()
+    
+    if len(username) < 5:
+        await message.answer("⚠️ Username must be at least 5 characters long.")
+        return
+
+    user_id = message.from_user.id
+    processing_msg = await message.answer(f"🔍 Checking <code>@{username}</code>...", parse_mode="HTML")
+
+    try:
+        chat = await bot.get_chat(f"@{username}")
+        chat_type = chat.type
+        title_name = chat.title or chat.full_name or "Unknown"
+        
+        result_text = (
+            f"<b>[ Username Status ]</b>\n\n"
+            f"Target: <code>@{username}</code>\n"
+            f"Status: <b>Occupied ❌</b>\n"
+            f"Type: <code>{chat_type}</code>\n"
+            f"Name: <b>{title_name}</b>"
+        )
+    except TelegramBadRequest:
+        add_to_history(user_id, username)
+        result_text = (
+            f"<b>[ Username Status ]</b>\n\n"
+            f"Target: <code>@{username}</code>\n"
+            f"Status: <b>Available / Not Found ✅</b>"
+        )
+    except Exception:
+        result_text = f"⚠️ Error checking <code>@{username}</code>. Try again later."
+
+    await processing_msg.edit_text(result_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await state.clear()
 
 # --- ІСТОРІЯ ТА ПРЕМІУМ ---
 @dp.callback_query(F.data == "menu_history")
@@ -368,7 +415,7 @@ async def save_username_action(callback: CallbackQuery):
 async def main():
     init_db()
     logging.basicConfig(level=logging.INFO)
-    print("TagPulse FSM Bot is online!")
+    print("TagPulse Advanced Bot is online!")
     try:
         await dp.start_polling(bot)
     finally:
