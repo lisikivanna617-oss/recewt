@@ -97,31 +97,58 @@ async def is_user_banned(user_id: int) -> bool:
             row = await cur.fetchone()
             return bool(row[0]) if row and row[0] else False
 
-async def check_subscription(user_id: int) -> bool:
-    if user_id in (ADMIN_ID, TESTER_ID):
-        return True
-    try:
-        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        return member.status in ["creator", "administrator", "member"]
-    except Exception as e:
-        logger.error(f"Error checking subscription: {e}")
-        return True
-
 async def check_telegram_username(username: str) -> bool:
     username = username.lstrip("@").strip()
     if len(username) < 5:
         return False
 
-    # 1. Перевірка через офіційний Telegram Bot API
+    # 1. Перевірка через Telegram Bot API
     try:
         await bot.get_chat(f"@{username}")
-        # Якщо чат або юзера знайдено — тег точно ЗАЙНЯТИЙ
+        # Якщо Bot API знайшов чат/юзера — тег ТОЧНО ЗАЙНЯТИЙ
         return False
     except Exception as e:
         err_msg = str(e).lower()
-        # Якщо Telegram видав іншу помилку (наприклад, флуд-контроль) — пропускаємо
+        # Якщо помилка НЕ про відсутність чату (наприклад, флуд-контроль) — вважаємо зайнятим, щоб уникнути фейку
         if "chat not found" not in err_msg and "user not found" not in err_msg:
             return False
+
+    # 2. Посилена перевірка через t.me
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: requests.get(
+                f"https://t.me/{username}", 
+                timeout=4, 
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            )
+        )
+        
+        if response.status_code == 200:
+            html = response.text
+            
+            # Маркери того, що юзернейм ЗАЙНЯТИЙ (профіль, бот, канал, Fragment або інакна сторінка)
+            is_taken_markers = [
+                "tgme_page_title",          # Назва/ім'я
+                "tgme_page_extra",          # Підписники / @username
+                "tgme_action_button_new",   # Кнопка "Send Message" / "View in Telegram"
+                "fragment.com",             # Аукціон Fragment
+                "tgme_page_description",    # Опис
+                "tgme_icon_user"            # Іконка профілю
+            ]
+            
+            if any(marker in html for marker in is_taken_markers):
+                return False
+
+            # Юзернейм ВІЛЬНИЙ тільки якщо є чіткий текст про можливість його реєстрації
+            if "If you have Telegram, you can contact" in html and "right away" in html:
+                return True
+
+        return False
+    except Exception as e:
+        logger.error(f"HTTP check error for @{username}: {e}")
+               return False
 
     # 2. Додаткова перевірка через t.me (для виявлення зарезервованих юзерів, Fragment та забанених тегів)
     try:
