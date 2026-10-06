@@ -90,6 +90,7 @@ async def init_db():
         """)
         await db.execute("INSERT OR IGNORE INTO stats (id, total_searches, found_usernames) VALUES (1, 0, 0)")
         await db.commit()
+
 # --- Helper Functions ---
 async def is_user_banned(user_id: int) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -102,18 +103,14 @@ async def check_telegram_username(username: str) -> bool:
     if len(username) < 5:
         return False
 
-    # 1. Перевірка через Telegram Bot API
     try:
         await bot.get_chat(f"@{username}")
-        # Якщо Bot API знайшов чат/юзера — тег ТОЧНО ЗАЙНЯТИЙ
         return False
     except Exception as e:
         err_msg = str(e).lower()
-        # Якщо помилка НЕ про відсутність чату — вважаємо зайнятим, щоб уникнути фейку
         if "chat not found" not in err_msg and "user not found" not in err_msg:
             return False
 
-    # 2. Посилена перевірка через t.me
     try:
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
@@ -128,28 +125,22 @@ async def check_telegram_username(username: str) -> bool:
         if response.status_code == 200:
             html = response.text
             
-            # Маркери того, що юзернейм ЗАЙНЯТИЙ
             is_taken_markers = [
-                "tgme_page_title",          # Назва/ім'я
-                "tgme_page_extra",          # Підписники / @username
-                "tgme_action_button_new",   # Кнопка "Send Message" / "View in Telegram"
-                "fragment.com",             # Аукціон Fragment
-                "tgme_page_description",    # Опис
-                "tgme_icon_user"            # Іконка профілю
+                "tgme_page_title",
+                "tgme_page_extra",
+                "tgme_action_button_new",
+                "fragment.com",
+                "tgme_page_description",
+                "tgme_icon_user"
             ]
             
             if any(marker in html for marker in is_taken_markers):
                 return False
 
-            # Юзернейм ВІЛЬНИЙ тільки якщо є чіткий текст про можливість його реєстрації
             if "If you have Telegram, you can contact" in html and "right away" in html:
                 return True
 
         return False
-    except Exception as e:
-        logger.error(f"HTTP check error for @{username}: {e}")
-        return False
-        
     except Exception as e:
         logger.error(f"HTTP check error for @{username}: {e}")
         return False
@@ -218,7 +209,7 @@ def get_main_keyboard(user_id: int, plan: str):
         [InlineKeyboardButton(text="⭐ Premium & Rewards", callback_data="menu_premium")]
     ]
     if user_id == ADMIN_ID:
-        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel", callback_data="admin_panel")])
+        buttons.append([InlineKeyboardButton(text="⚙️️ Admin Panel", callback_data="admin_panel")])
     elif user_id == TESTER_ID:
         buttons.append([InlineKeyboardButton(text="🧪 Tester Panel", callback_data="tester_panel")])
         
@@ -228,6 +219,18 @@ def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅ Back to Menu", callback_data="main_menu")]
     ])
+
+# --- Subscription Check Function ---
+async def check_subscription(user_id: int) -> bool:
+    if user_id in (ADMIN_ID, TESTER_ID):
+        return True
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ["creator", "administrator", "member"]
+    except Exception as e:
+        logger.error(f"Error checking subscription for {user_id}: {e}")
+        return True
+
 # --- Handlers: Start & Commands ---
 
 @dp.message(Command("start"))
@@ -337,6 +340,7 @@ async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
     )
     await callback.message.edit_text(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
     await callback.answer()
+
 # --- Handlers: Search Generator ---
 
 @dp.callback_query(F.data == "menu_search_gen")
@@ -355,7 +359,7 @@ async def cb_menu_search_gen(callback: CallbackQuery):
          InlineKeyboardButton(text="🔢 7 Chars (Mixed)", callback_data="gen_7_alnum")],
         [InlineKeyboardButton(text="🔤 8 Chars (Letters)", callback_data="gen_8_alpha"),
          InlineKeyboardButton(text="🔢 8 Chars (Mixed)", callback_data="gen_8_alnum")],
-        [InlineKeyboardButton(text="⬅️️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton(text="⬅ Back", callback_data="main_menu")]
     ])
     text = "<b>🎲 Select username length and format to search:</b>"
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
@@ -490,6 +494,7 @@ async def sniper_background_worker():
             logger.error(f"Error in sniper: {e}")
 
         await asyncio.sleep(45)
+
 # --- Premium & Admin Handlers ---
 
 @dp.callback_query(F.data == "menu_tags")
@@ -516,19 +521,14 @@ async def cb_menu_premium(callback: CallbackQuery):
     text = (
         f"⚡ <b>TagPulse Premium</b>\n\n"
         f"Your ultimate tool for hunting rare usernames 🎯\n\n"
-        f"📊 <b>Plan Comparison:</b>\n\n"
-        f"🔹 <b>FREE:</b>\n"
-        f"└ 🐢 Standard search speed\n"
-        f"└ ⏱ Limit: 5 searches per day\n"
-        f"└ 📩 1 available tag per attempt\n\n"
         f"🌟 <b>PREMIUM:</b>\n"
-        f"└ ⚡ <b>2.5x Faster Search Speed</b> (priority checks)\n"
+        f"└ ⚡ <b>2.5x Faster Search Speed</b>\n"
         f"└ ♾️ <b>Unlimited Daily Searches</b>\n"
-        f"└ 📦 <b>3 Available Tags</b> in a single click\n"
-        f"└ 🎯 <b>Auto-Sniper</b> (24/7 username monitoring)\n\n"
+        f"└ 📦 <b>3 Available Tags</b> per click\n"
+        f"└ 🎯 <b>Auto-Sniper 24/7</b>\n\n"
         f"💳 <b>How to Get Premium:</b>\n"
-        f"• <b>5 ⭐</b> / month (Contact Owner)\n"
-        f"• 🤝 <b>100% FREE</b> — Invite <b>3 friends</b> to get 7 days of Premium!\n\n"
+        f"• <b>5 ⭐</b> / month\n"
+        f"• 🤝 Invite <b>3 friends</b> to get 7 days free!\n\n"
         f"🔗 <b>Your Referral Link:</b>\n<code>{ref_link}</code>\n"
         f"👥 Invites Progress: <b>{refs}/3</b>"
     )
@@ -662,6 +662,7 @@ async def cb_tester_panel(callback: CallbackQuery):
     if callback.from_user.id not in (ADMIN_ID, TESTER_ID): return
     await callback.message.edit_text("🧪 <b>Tester Panel:</b> All systems operational.", reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
+
 # --- Entry Point ---
 
 async def main():
@@ -680,3 +681,4 @@ if __name__ == "__main__":
         
     threading.Thread(target=run_web, daemon=True).start()
     asyncio.run(main())
+            
