@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "5619415334"))
-TESTER_ID = int(os.environ.get("TESTER_ID", "8644168067"))
+HELPER_ID = int(os.environ.get("HELPER_ID", "8644168067"))
 DB_PATH = "bot_database.db"
 
 # --- Channel Configuration ---
@@ -40,7 +40,7 @@ def home():
     return "TagPulse Bot is live!"
 
 def run_web():
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     web_app.run(host="0.0.0.0", port=port)
 
 # --- FSM States ---
@@ -205,13 +205,13 @@ def get_main_keyboard(user_id: int, plan: str):
     buttons = [
         [InlineKeyboardButton(text="⚡ Generate & Search Tags", callback_data="menu_search_gen")],
         [InlineKeyboardButton(text="🎯 Auto-Sniper 24/7", callback_data="menu_sniper")],
-        [InlineKeyboardButton(text="🏷 My Saved Tags", callback_data="menu_tags")],
+        [InlineKeyboardButton(text="🏷 My Saved Tags", callback_data="menu_saved_tags")],
         [InlineKeyboardButton(text="⭐ Premium & Rewards", callback_data="menu_premium")]
     ]
     if user_id == ADMIN_ID:
-        buttons.append([InlineKeyboardButton(text="⚙️️ Admin Panel", callback_data="admin_panel")])
-    elif user_id == TESTER_ID:
-        buttons.append([InlineKeyboardButton(text="🧪 Tester Panel", callback_data="tester_panel")])
+        buttons.append([InlineKeyboardButton(text="⚙ Admin Panel", callback_data="admin_panel")])
+    elif user_id == HELPER_ID:
+        buttons.append([InlineKeyboardButton(text="🛠 Helper Panel", callback_data="helper_panel")])
         
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -220,9 +220,24 @@ def get_back_keyboard():
         [InlineKeyboardButton(text="⬅ Back to Menu", callback_data="main_menu")]
     ])
 
-# --- Subscription Check Function ---
+def get_length_keyboard():
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔤 5 Chars", callback_data="len_5"), InlineKeyboardButton(text="🔤 6 Chars", callback_data="len_6")],
+        [InlineKeyboardButton(text="🔤 7 Chars", callback_data="len_7"), InlineKeyboardButton(text="🔤 8 Chars", callback_data="len_8")],
+        [InlineKeyboardButton(text="⬅ Back to Menu", callback_data="main_menu")]
+    ])
+    return kb
+
+def get_type_keyboard(length: int):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔤 Letters", callback_data=f"gen_{length}_alpha")],
+        [InlineKeyboardButton(text="🔢 Mixed (Letters + Numbers)", callback_data=f"gen_{length}_alnum")],
+        [InlineKeyboardButton(text="⬅ Back to Length", callback_data="menu_search_gen")]
+    ])
+    return kb
+
 async def check_subscription(user_id: int) -> bool:
-    if user_id in (ADMIN_ID, TESTER_ID):
+    if user_id in (ADMIN_ID, HELPER_ID):
         return True
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
@@ -230,8 +245,7 @@ async def check_subscription(user_id: int) -> bool:
     except Exception as e:
         logger.error(f"Error checking subscription for {user_id}: {e}")
         return True
-
-# --- Handlers: Start & Commands ---
+    # --- Handlers: Start & Commands ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
@@ -245,7 +259,7 @@ async def cmd_start(message: Message, state: FSMContext):
     if not await check_subscription(user_id):
         text = (
             "⚠ <b>Access Restricted!</b>\n\n"
-            "To use <b>TagPulse Bot</b>, please subscribe to our official channel where we publish all our projects and updates!"
+            "To use <b>TagPulse Bot</b>, please subscribe to our official channel!"
         )
         await message.answer(text, reply_markup=get_sub_keyboard(), parse_mode="HTML")
         return
@@ -296,13 +310,15 @@ async def cb_check_sub(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ You are still not subscribed to the channel!", show_alert=True)
 
 @dp.message(Command("tags"))
-async def cmd_tags(message: Message):
-    user_id = message.from_user.id
-    if await is_user_banned(user_id):
-        return
+@dp.callback_query(F.data == "menu_saved_tags")
+async def cmd_tags(msg_or_cb):
+    user_id = msg_or_cb.from_user.id
+    is_cb = isinstance(msg_or_cb, CallbackQuery)
+    msg = msg_or_cb.message if is_cb else msg_or_cb
 
+    if await is_user_banned(user_id): return
     if not await check_subscription(user_id):
-        await message.answer("⚠ Please subscribe to our channel first!", reply_markup=get_sub_keyboard(), parse_mode="HTML")
+        await msg.answer("⚠ Please subscribe to our channel first!", reply_markup=get_sub_keyboard(), parse_mode="HTML")
         return
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -310,14 +326,12 @@ async def cmd_tags(message: Message):
             tags = await cur.fetchall()
 
     if not tags:
-        await message.answer("<b>🏷 Saved Tags:</b>\nYou haven't saved any available tags yet.", reply_markup=get_back_keyboard(), parse_mode="HTML")
-        return
+        text = "<b>🏷 Saved Tags:</b>\nYou haven't saved any available tags yet."
+    else:
+        text = "<b>🏷 Your Available Saved Tags:</b>\n\n" + "\n".join([f"• <code>@{t[0]}</code>" for t in tags])
 
-    text = "<b>🏷 Your Available Saved Tags:</b>\n\n"
-    for t in tags:
-        text += f"• <code>@{t[0]}</code>\n"
-
-    await message.answer(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    await (msg.edit_text if is_cb else msg.answer)(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+    if is_cb: await msg_or_cb.answer()
 
 @dp.callback_query(F.data == "main_menu")
 async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
@@ -350,19 +364,17 @@ async def cb_menu_search_gen(callback: CallbackQuery):
         await callback.message.edit_text("⚠ Subscribe to channel first!", reply_markup=get_sub_keyboard())
         return
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔤 5 Chars (Letters)", callback_data="gen_5_alpha"),
-         InlineKeyboardButton(text="🔢 5 Chars (Mixed)", callback_data="gen_5_alnum")],
-        [InlineKeyboardButton(text="🔤 6 Chars (Letters)", callback_data="gen_6_alpha"),
-         InlineKeyboardButton(text="🔢 6 Chars (Mixed)", callback_data="gen_6_alnum")],
-        [InlineKeyboardButton(text="🔤 7 Chars (Letters)", callback_data="gen_7_alpha"),
-         InlineKeyboardButton(text="🔢 7 Chars (Mixed)", callback_data="gen_7_alnum")],
-        [InlineKeyboardButton(text="🔤 8 Chars (Letters)", callback_data="gen_8_alpha"),
-         InlineKeyboardButton(text="🔢 8 Chars (Mixed)", callback_data="gen_8_alnum")],
-        [InlineKeyboardButton(text="⬅ Back", callback_data="main_menu")]
-    ])
-    text = "<b>🎲 Select username length and format to search:</b>"
-    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    text = "🎲 <b>Step 1:</b> Select username length:"
+    await callback.message.edit_text(text, reply_markup=get_length_keyboard(), parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("len_"))
+async def cb_tag_length(callback: CallbackQuery):
+    if await is_user_banned(callback.from_user.id): return
+    
+    length = int(callback.data.split("_")[1])
+    text = f"⚙️ <b>Step 2:</b> Select format for <b>{length} characters</b>:"
+    await callback.message.edit_text(text, reply_markup=get_type_keyboard(length), parse_mode="HTML")
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("gen_"))
@@ -387,7 +399,7 @@ async def cb_process_generate(callback: CallbackQuery):
     is_premium = "PREMIUM" in plan
     target_count = 3 if is_premium else 1
 
-    await callback.answer("⚡ Searching with 2.5x priority speed..." if is_premium else "Searching...", show_alert=False)
+    await callback.answer("⚡ Searching..." if not is_premium else "⚡ Searching with 2.5x priority speed...", show_alert=False)
 
     found_results = []
     attempts = 0
@@ -415,12 +427,12 @@ async def cb_process_generate(callback: CallbackQuery):
         body = "\n".join(found_results)
     else:
         header = "<b>🔎 Search Results:</b>\n\n"
-        body = f"❌ Checked {attempts} generated tags, but none were free. Click below to try again!"
+        body = f"❌ Checked {attempts} generated tags, but none were free. Try again!"
 
     if not is_premium:
-        body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for 2.5x faster search & 3 tags per click!</i>"
+        body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for 2.5x faster search!</i>"
     else:
-        body += f"\n\n⚡ <i>Priority 2.5x Fast Engine Active</i>"
+        body += f"\n\n⚡ <i>Priority Fast Engine Active</i>"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔄 Search Again", callback_data=callback.data)],
@@ -497,11 +509,6 @@ async def sniper_background_worker():
 
 # --- Premium & Admin Handlers ---
 
-@dp.callback_query(F.data == "menu_tags")
-async def cb_menu_tags(callback: CallbackQuery):
-    await cmd_tags(callback.message)
-    await callback.answer()
-
 @dp.callback_query(F.data == "menu_premium")
 async def cb_menu_premium(callback: CallbackQuery):
     if await is_user_banned(callback.from_user.id): return
@@ -521,6 +528,11 @@ async def cb_menu_premium(callback: CallbackQuery):
     text = (
         f"⚡ <b>TagPulse Premium</b>\n\n"
         f"Your ultimate tool for hunting rare usernames 🎯\n\n"
+        f"📊 <b>Plan Comparison:</b>\n\n"
+        f"🔹 <b>FREE:</b>\n"
+        f"└ 🐢 Standard search speed\n"
+        f"└ ⏱ Limit: 5 searches per day\n"
+        f"└ 📩 1 available tag per attempt\n\n"
         f"🌟 <b>PREMIUM:</b>\n"
         f"└ ⚡ <b>2.5x Faster Search Speed</b>\n"
         f"└ ♾️ <b>Unlimited Daily Searches</b>\n"
@@ -536,7 +548,7 @@ async def cb_menu_premium(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
-# --- ADMIN PANEL ---
+# --- ADMIN & HELPER PANEL ---
 
 @dp.callback_query(F.data == "admin_panel")
 async def cb_admin_panel(callback: CallbackQuery):
@@ -657,10 +669,10 @@ async def process_admin_broadcast(message: Message, state: FSMContext):
     await message.answer(f"📢 <b>Broadcast Finished!</b>\n\n✅ Delivered: {success}\n❌ Failed: {failed}", parse_mode="HTML")
     await state.clear()
 
-@dp.callback_query(F.data == "tester_panel")
-async def cb_tester_panel(callback: CallbackQuery):
-    if callback.from_user.id not in (ADMIN_ID, TESTER_ID): return
-    await callback.message.edit_text("🧪 <b>Tester Panel:</b> All systems operational.", reply_markup=get_back_keyboard(), parse_mode="HTML")
+@dp.callback_query(F.data == "helper_panel")
+async def cb_helper_panel(callback: CallbackQuery):
+    if callback.from_user.id not in (ADMIN_ID, HELPER_ID): return
+    await callback.message.edit_text("🛠 <b>Helper Panel:</b> All systems operational.", reply_markup=get_back_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 # --- Entry Point ---
