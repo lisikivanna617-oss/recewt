@@ -245,7 +245,11 @@ async def check_subscription(user_id: int) -> bool:
     except Exception as e:
         logger.error(f"Error checking subscription for {user_id}: {e}")
         return True
-    # --- Handlers: Start & Commands ---
+    # ---     )
+    await callback.message.edit_text(text, reply_markup=get_main_keyboard(user_id, plan), parse_mode="HTML")
+    await callback.answer()
+
+# --- Handlers: Start & Commands ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
@@ -399,11 +403,11 @@ async def cb_process_generate(callback: CallbackQuery):
     is_premium = "PREMIUM" in plan
     target_count = 3 if is_premium else 1
 
-    await callback.answer("⚡ Searching..." if not is_premium else "⚡ Searching with 2.5x priority speed...", show_alert=False)
+    await callback.answer("⚡ Searching..." if not is_premium else "⚡ Fast Engine Searching...", show_alert=False)
 
     found_results = []
     attempts = 0
-    max_attempts = 25
+    max_attempts = 60 if is_premium else 35
 
     async with aiosqlite.connect(DB_PATH) as db:
         while len(found_results) < target_count and attempts < max_attempts:
@@ -412,13 +416,21 @@ async def cb_process_generate(callback: CallbackQuery):
             
             await db.execute("UPDATE stats SET total_searches = total_searches + 1 WHERE id = 1")
             
-            is_free = await check_telegram_username(tag)
+            # Пряма перевірка через Telegram API
+            is_free = False
+            try:
+                await bot.get_chat(f"@{tag}")
+            except Exception as e:
+                err = str(e).lower()
+                if "chat not found" in err or "user not found" in err:
+                    is_free = True
+
             if is_free:
                 await db.execute("UPDATE stats SET found_usernames = found_usernames + 1 WHERE id = 1")
                 await db.execute("INSERT INTO user_tags (user_id, tag_name) VALUES (?, ?)", (user_id, tag))
                 found_results.append(f"✅ <code>@{tag}</code> — <b>AVAILABLE!</b>")
             
-            await asyncio.sleep(0.06 if is_premium else 0.15)
+            await asyncio.sleep(0.03 if is_premium else 0.08)
             
         await db.commit()
 
@@ -427,10 +439,10 @@ async def cb_process_generate(callback: CallbackQuery):
         body = "\n".join(found_results)
     else:
         header = "<b>🔎 Search Results:</b>\n\n"
-        body = f"❌ Checked {attempts} generated tags, but none were free. Try again!"
+        body = f"❌ Checked {attempts} tags, but all were occupied. Try again!"
 
     if not is_premium:
-        body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for 2.5x faster search!</i>"
+        body += f"\n\n📊 <i>Remaining attempts today: {remaining_attempts}/5</i>\n💡 <i>Upgrade to PREMIUM for faster search & 3 tags per click!</i>"
     else:
         body += f"\n\n⚡ <i>Priority Fast Engine Active</i>"
 
@@ -490,7 +502,13 @@ async def sniper_background_worker():
                     snipes = await cur.fetchall()
 
                 for snipe_id, user_id, tag in snipes:
-                    is_free = await check_telegram_username(tag)
+                    is_free = False
+                    try:
+                        await bot.get_chat(f"@{tag}")
+                    except Exception as e:
+                        if "chat not found" in str(e).lower() or "user not found" in str(e).lower():
+                            is_free = True
+
                     if is_free:
                         try:
                             await bot.send_message(
@@ -693,4 +711,4 @@ if __name__ == "__main__":
         
     threading.Thread(target=run_web, daemon=True).start()
     asyncio.run(main())
-            
+        
